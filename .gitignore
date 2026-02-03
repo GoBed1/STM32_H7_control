@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pyw
+*.pyz
+
+Debug/
+Release/
+UnitTest/
+CraneSensorHub Debug.launch
+CraneSensorHub.launch
+
+.settings/language.settings.xml
+.vscode/
+settings/language.settings.xml
+settings/stm32cubeide.project.prefs
+.settings/*
+.settings/
+.cproject
+.mxproject
+.project

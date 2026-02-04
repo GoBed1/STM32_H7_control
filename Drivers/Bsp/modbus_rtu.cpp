@@ -90,6 +90,8 @@ bool ModbusRtu::asyncWriteSingle(uint8_t slaveId,
     return true;
 }
 
+
+
 bool ModbusRtu::asyncWriteMultiple(uint8_t slaveId,
                                    uint16_t startAddr,
                                    uint16_t regsCount,

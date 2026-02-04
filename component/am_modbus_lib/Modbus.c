@@ -1640,6 +1640,16 @@ static void sendTxBuffer(modbusHandler_t *modH)
         modH->u16OutCnt++;
         return;
     }
+ // Debug output - print Modbus frame being sent
+    // printf("[Modbus TX] ID:0x%02X FC:0x%02X Addr:0x%04X Data:",
+    //        modH->u8Buffer[ID], 
+    //        modH->u8Buffer[FUNC],
+    //        (modH->u8Buffer[ADD_HI] << 8) | modH->u8Buffer[ADD_LO]);
+    
+    // for(int i = 0; i < modH->u8BufferSize; i++) {
+    //     printf("%02X ", modH->u8Buffer[i]);
+    // }
+    // printf("\n");
 
     // append CRC to message
 
@@ -1653,6 +1663,8 @@ if(modH->xTypeHW != TCP_HW)
     modH->u8BufferSize++;
     modH->u8Buffer[ modH->u8BufferSize ] = u16crc & 0x00ff;
     modH->u8BufferSize++;
+		
+	debug_log_recv_frame(modH);
 
 #if ENABLE_TCP == 1
 	 }

@@ -383,7 +383,15 @@ void StartBlockReadEncoderForwardTask(void *argument)
 #include "read_encoder_task.h"
 #include "oid_encoder.hpp"
 // #include "test.h"
+#define CMD_LED_SWITCH 0
+#define STATUS_LED_SWITCH 100
+// 喇叭
+#define CMD_BUZZER_7m 1
+#define CMD_BUZZER_3m 2
+// #define CMD_BUZZER_stop 3
 
+#define STATUS_BUZZER 101
+#define STATUS_BMS_SOC 102
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
@@ -392,11 +400,13 @@ extern UART_HandleTypeDef huart8;
 // Slave全局变量
 static modbusHandler_t encoder_forward_server;
 static modbusHandler_t encoder_forward_server_backup;
- uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
+uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
 
 static OidEncoder g_encoder1(1, 1, &huart8); // 用于 huart2
 static OidEncoder g_encoder2(2, 1, &huart3); // 用于 huart3
 static OidEncoder g_encoder3(3, 1, &huart8); // 用于 huart8
+
+void buzzer_logic(void);
 
 osThreadId_t ReadEncoderForwardTaskHandle;
 const osThreadAttr_t ReadEncoderForwardTask_attributes = {
@@ -425,7 +435,13 @@ const osThreadAttr_t ReadEncoderTask3_attributes = {
     .stack_size = 512 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
 };
+ModbusRtu bms_led_sound_app;
 
+modbusHandler_t bms_sound_light_app;
+modbus_t telegram[2];
+uint16_t ModbusDATA2[128];
+
+// 初始化Slave
 void init_encoder_forward_slave(void)
 {
     // 初始化寄存器数组
@@ -597,76 +613,220 @@ void encoder_update_multi(const uint8_t id, const uint16_t count, const uint16_t
 //     }
 // }
 
-ModbusRtu bms_led_sound_app;
-uint16_t bms_results[2] = {0};
-void StartReadEncoderTask(void *argument)
+void modbus_TxData_logic(void)
 {
-    OidEncoder *encoder = static_cast<OidEncoder *>(argument);
-    if (!encoder)
+    uint16_t cmd_led_switch = modbus_registers[CMD_LED_SWITCH];
+    // 读取寄存器0的值，例如
+    // 灯打开或关闭命令
+    if (cmd_led_switch == 1 && modbus_registers[STATUS_LED_SWITCH] == 0)
     {
-        return;
+        // 红灯打常量开
+        // 记录超时或者crc校验重复发送命令的逻辑
+        // record_tx_cmd(cmd_red_com, 6);
+        // YX95R_LIGHT_ON_RED_COM;
+        printf(" LED on \n");
+        // bms_led_sound_app.asyncWriteSingle(0x01,0x00c2,0x0041);
+        // StartTaskMaster();
+        // 看看发出去的数据是啥sendTxBuffer
+
+        // 更新状态寄存器regs[100]且清除命令寄存器regs[0]
+        modbus_registers[STATUS_LED_SWITCH] = 1;
+        // 通知RX任务：我发送了命令，你可以等待响应了！
+        // xEventGroupSetBits(eg, EVENT_CMD_SENT);
+    }
+    if (cmd_led_switch == 0 && modbus_registers[STATUS_LED_SWITCH] == 1)
+    {
+        // 灯关闭
+        // debug_println(" LED off ");
+        // YX95R_RGB_Light_Off(1); // 红色慢闪
+        // record_tx_cmd(cmd_off, 6);
+
+        // YX95R_LIGHT_OFF;
+        printf(" LED off \n");
+
+        bms_led_sound_app.asyncWriteSingle(0x01, 0x00c2, 0x0060);
+        modbus_registers[STATUS_LED_SWITCH] = 0;
+        // 通知RX任务：我发送了命令，你可以等待响应了！
+        // xEventGroupSetBits(eg, EVENT_CMD_SENT);
+    }
+    // 喇叭逻辑处理
+    buzzer_logic();
+
+    // bms电源读取发送
+    // bms_read_logic();
+}
+
+// 喇叭逻辑处理函数
+void buzzer_logic(void)
+{
+    // 算目标模式：3m 优先于 7m，3m覆盖7m，二者都为0时关闭喇叭。
+    buzzer_mode_t target = BUZZER_OFF;
+
+    if (modbus_registers[CMD_BUZZER_3m] == 1)
+    {
+        target = BUZZER_3M;
+    }
+    else if (modbus_registers[CMD_BUZZER_7m] == 1)
+    {
+        target = BUZZER_7M;
+    }
+    else
+    {
+        target = BUZZER_OFF;
     }
 
-    TickType_t last_10s = xTaskGetTickCount();
-    TickType_t last_500ms = xTaskGetTickCount();
+    // 只在变化时执行
+    static buzzer_mode_t current = BUZZER_OFF;
+    if (target == current)
+        return;
 
-    // encoder->init_();
-    bms_led_sound_app.initMaster(&huart8, NULL, 0, 500, USART_HW); // huart8为主站接口
-    bool pending = false;
-    uint32_t notifyValue = 0;
-    TickType_t xLastWakeTime = 0;
-    const TickType_t xFrequency = pdMS_TO_TICKS(100); // 10Hz = 100ms
-                                                      // uint16_t posRegs_[2] ={0};
+    switch (target)
+    {
+    case BUZZER_3M:
+        // record_tx_cmd(cmd_sound_3m_warn, 6);
+        // BUZZER_SOUND_3M_WARN;
+        bms_led_sound_app.asyncWriteSingle(0x02, 0x0008, 0x0007);
+        modbus_registers[STATUS_BUZZER] = 1;
+        break;
+
+    case BUZZER_7M:
+        // record_tx_cmd(cmd_sound_7m_warn, 6);
+        // BUZZER_SOUND_7M_WARN;
+        bms_led_sound_app.asyncWriteSingle(0x02, 0x0008, 0x0008);
+
+        modbus_registers[STATUS_BUZZER] = 1;
+        break;
+
+    default: // OFF
+        // record_tx_cmd(cmd_sound_stop, 6);
+        // BUZZER_SOUND_STOP;
+        bms_led_sound_app.asyncWriteSingle(0x02, 0x0016, 0x0001);
+        modbus_registers[STATUS_BUZZER] = 0;
+        break;
+    }
+
+    current = target;
+
+    // 只有真的发了命令才通知 RX 任务
+    // xEventGroupSetBits(eg, EVENT_CMD_SENT);
+}
+
+uint16_t bms_results[2] = {0};
+// void StartReadEncoderTask(void *argument)
+// {
+//     OidEncoder *encoder = static_cast<OidEncoder *>(argument);
+//     if (!encoder)
+//     {
+//         return;
+//     }
+
+//     TickType_t last_10s = xTaskGetTickCount();
+//     TickType_t last_500ms = xTaskGetTickCount();
+
+//     // encoder->init_();
+//     bms_led_sound_app.initMaster(&huart8, NULL, 0, 500, USART_HW); // huart8为主站接口
+   
+
+
+//     bool pending = false;
+//     uint32_t notifyValue = 0;
+//     TickType_t xLastWakeTime = 0;
+//     const TickType_t xFrequency = pdMS_TO_TICKS(100); // 10Hz = 100ms
+//                                                       // uint16_t posRegs_[2] ={0};
+
+//     for (;;)
+//     {
+
+// #ifdef USE_FAKE_ENCODER
+//         uint32_t posRaw = 0x00000000 + encoder->getDeviceId();
+//         encoder_update_multi(encoder->getDeviceId(), (uint16_t)(posRaw >> 16), (uint16_t)(posRaw & 0xFFFF), true);
+//         RET_D("Encoder%d position: %ld\n", encoder->getDeviceId(), posRaw);
+// #else
+//         if (!pending)
+//         {
+
+//             // 每 500ms 执行一次
+//             if (xTaskGetTickCount() - last_500ms >= pdMS_TO_TICKS(500))
+//             {
+//                 last_500ms += pdMS_TO_TICKS(500);
+//                 modbus_TxData_logic();
+//             }
+//             // 每 10s 执行一次（读取电量/电流）
+//             if (xTaskGetTickCount() - last_10s >= pdMS_TO_TICKS(10000))
+//             {
+//                 last_10s += pdMS_TO_TICKS(10000);
+//                 //   record_tx_cmd(cmd_read_soc, 6);
+//                 // 读取电量soc
+//                 // bms_led_sound_app.asyncWriteSingle(0x01,0x00c2,0x0041);
+//                 bms_led_sound_app.asyncReadHolding(0x04, 0x0000, 1, bms_results);
+
+//                 // test_function();
+//                 //   xEventGroupSetBits(eg, EVENT_CMD_SENT); // 通知接收任务去等 ACK
+//             }
+//         }
+
+//         if (xTaskNotifyWait(0, 0xFFFFFFFF, &notifyValue, 0) == pdTRUE)
+//         {
+//             pending = false;
+//             if (notifyValue == OP_OK_QUERY)
+//             {
+//                 printf("regs: %d , %d\n", bms_results[0], modbus_registers[102]);
+//                 modbus_registers[102] = bms_results[0];
+//                 printf("bms soc: %d \n", modbus_registers[102]);
+//                 printf("modbus_registers[0]= %d,modbus_registers[100]= %d", modbus_registers[0], modbus_registers[100]);
+//                 // uint32_t pos = encoder->getLastPositionRaw();
+//                 // encoder_update_multi(encoder->getDeviceId(), (uint16_t)(pos >> 16), (uint16_t)(pos & 0xFFFF), true);
+//             }
+//             else
+//             {
+//                 RET_E("Encoder%d read error: %ld\n", encoder->getDeviceId(), notifyValue);
+//             }
+//         }
+// #endif
+//         vTaskDelay(200);
+//     }
+// }
+
+
+void test_bms_led_task(void*arrgument)
+
+{
+    uint32_t u32NotificationValue;
+    telegram[0].u8id = 1;                     // slave address
+    telegram[0].u8fct = MB_FC_WRITE_REGISTER; // function code (this one is registers read)
+    telegram[0].u16RegAdd = 0x00c2;           // start address in slave
+    telegram[0].u16CoilsNo = 0x0041;          // number of elements (coils or registers) to read
+    
+    // bms_sound_light_app.initMaster(&huart8, NULL, 0, 500, USART_HW); // huart8为主站接口
+    bms_sound_light_app.uModbusType = MB_MASTER;
+    bms_sound_light_app.port =  &huart8;
+    bms_sound_light_app.u8id = 0; // For master it must be 0
+    bms_sound_light_app.u16timeOut = 1000;
+    bms_sound_light_app.EN_Port = NULL;
+    bms_sound_light_app.EN_Port = NULL;
+    bms_sound_light_app.EN_Pin = 0;
+    bms_sound_light_app.u16regs = ModbusDATA2;
+    bms_sound_light_app.u16regsize= sizeof(ModbusDATA2)/sizeof(ModbusDATA2[0]);
+    bms_sound_light_app.xTypeHW = USART_HW;
+    //Initialize Modbus library
+    ModbusInit(&bms_sound_light_app);
+    //Start capturing traffic on serial Port
+    ModbusStart(&bms_sound_light_app);
 
     for (;;)
     {
-
-#ifdef USE_FAKE_ENCODER
-        uint32_t posRaw = 0x00000000 + encoder->getDeviceId();
-        encoder_update_multi(encoder->getDeviceId(), (uint16_t)(posRaw >> 16), (uint16_t)(posRaw & 0xFFFF), true);
-        RET_D("Encoder%d position: %ld\n", encoder->getDeviceId(), posRaw);
-#else
-        if (!pending)
+        ModbusQuery(&bms_sound_light_app, telegram[0]);       // make a query
+        u32NotificationValue = ulTaskNotifyTake(pdTRUE, 500); // block until query finishes or timeout
+        if (u32NotificationValue)
         {
-
-            // 每 500ms 执行一次
-            if (xTaskGetTickCount() - last_500ms >= pdMS_TO_TICKS(500))
-            {
-                last_500ms += pdMS_TO_TICKS(500);
-                // modbus_TxData_logic();
-            }
-            // 每 10s 执行一次（读取电量/电流）
-            if (xTaskGetTickCount() - last_10s >= pdMS_TO_TICKS(10000))
-            {
-                last_10s += pdMS_TO_TICKS(10000);
-                //   record_tx_cmd(cmd_read_soc, 6);
-                //读取电量soc
-                bms_led_sound_app.asyncReadHolding(0x04, 0x0000, 1, bms_results);
-// test_function();
-                //   xEventGroupSetBits(eg, EVENT_CMD_SENT); // 通知接收任务去等 ACK
-            }
+            // handle error
+            //   while(1);
         }
-
-        if (xTaskNotifyWait(0, 0xFFFFFFFF, &notifyValue, 0) == pdTRUE)
-        {
-            pending = false;
-            if (notifyValue == OP_OK_QUERY)
-            {
-                printf("regs: %d , %d\n", bms_results[0], modbus_registers[0]);
-                modbus_registers[102] = bms_results[0];
-
-                // uint32_t pos = encoder->getLastPositionRaw();
-                // encoder_update_multi(encoder->getDeviceId(), (uint16_t)(pos >> 16), (uint16_t)(pos & 0xFFFF), true);
-            }
-            else
-            {
-                RET_E("Encoder%d read error: %ld\n", encoder->getDeviceId(), notifyValue);
-            }
-        }
-#endif
-        vTaskDelay(200);
+        osDelay(500);
     }
 }
+
+
 
 #endif
 
@@ -686,7 +846,9 @@ void init_read_encoder_task()
     init_encoder_forward_slave();
 
     // bms读取+控制爆闪灯+控制喇叭任务
-    ReadEncoderTask1Handle = osThreadNew(StartReadEncoderTask, &g_encoder1, &ReadEncoderTask1_attributes);
+    // ReadEncoderTask1Handle = osThreadNew(StartReadEncoderTask, &g_encoder1, &ReadEncoderTask1_attributes);
+   
+    ReadEncoderTask1Handle = osThreadNew(test_bms_led_task, NULL, &ReadEncoderTask1_attributes);
     // ReadEncoderTask2Handle = osThreadNew(StartReadEncoderTask, &g_encoder2, &ReadEncoderTask2_attributes);
     // ReadEncoderTask3Handle = osThreadNew(StartReadEncoderTask, &g_encoder3, &ReadEncoderTask3_attributes);
     RET_I("device type = HUB_SLAVE; version = %d\r\n", HUB_SLAVE_VERSION);

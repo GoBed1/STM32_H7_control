@@ -2100,6 +2100,27 @@ int8_t process_FC16(modbusHandler_t *modH )
     return u8CopyBufferSize;
 }
 
+int8_t ModbusSafeReadRegister(modbusHandler_t *modH, uint16_t address, uint16_t *value)
+	{
+		if (modH == NULL || value == NULL) return -1;
+		if (address >= modH->u16regsize) return -1;
+
+		if (xSemaphoreTake(modH->ModBusSphrHandle, pdMS_TO_TICKS(100)) != pdTRUE) return -2;
+		*value = modH->u16regs[address];
+		xSemaphoreGive(modH->ModBusSphrHandle);
+		return 0;
+	}
+
+	int8_t ModbusSafeWriteRegister(modbusHandler_t *modH, uint16_t address, uint16_t value)
+	{
+		if (modH == NULL) return -1;
+		if (address >= modH->u16regsize) return -1;
+
+		if (xSemaphoreTake(modH->ModBusSphrHandle, pdMS_TO_TICKS(100)) != pdTRUE) return -2;
+		modH->u16regs[address] = value;
+		xSemaphoreGive(modH->ModBusSphrHandle);
+		return 0;
+	}
 
 
 

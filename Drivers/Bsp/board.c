@@ -34,6 +34,9 @@ uint32_t get_time_ms(void)
 #endif
 }
 
+// #include "modbus_rtu.hpp"
+// extern ModbusRtu bms_led_sound_app;
+
 void show_heartbeat(void) {
     toggle_led("led1");
 }
@@ -80,6 +83,9 @@ void init_app(void)
 #ifdef ENABLE_HEARTBEAT_TASK
   register_heartbeat_led_func(heartbeat_led_adapter);
   register_offline_led_func(offline_led_adapter);
+// bms_led_sound_app.
+// uint16_t bms_results[10] = {0};
+//  bms_led_sound_app.asyncReadHolding(0x04, 0x0000, 1, bms_results);
   HeartbeatTaskHandle = osThreadNew(StartHeartbeatTask, NULL, &HeartbeatTask_attributes);
   printf("[INFO] [BOARD] ENABLE_HEARTBEAT_TASK\r\n");
 #endif

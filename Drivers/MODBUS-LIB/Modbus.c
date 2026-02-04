@@ -364,7 +364,8 @@ void ModbusStart(modbusHandler_t * modH)
           //check that port is initialized
           while (HAL_UART_GetState(modH->port) != HAL_UART_STATE_READY)
           {
-
+printf("Waiting for port to be ready\n");
+			osDelay(1000);
           }
 
 #if ENABLE_USART_DMA ==1

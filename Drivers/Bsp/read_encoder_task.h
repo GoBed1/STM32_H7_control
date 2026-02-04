@@ -11,7 +11,7 @@ extern "C" {
 #include "task.h"
 
 #include "Modbus.h"
-
+// extern ModbusRtu bms_led_sound_app;
 // 函数声明
 void init_read_encoder_task();
 #ifdef ENABLE_HUB_SLAVE

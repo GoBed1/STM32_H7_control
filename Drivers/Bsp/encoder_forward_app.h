@@ -27,7 +27,7 @@ extern "C" {
 #define REG_SENSOR3_POS_LO    0x0009  // 传感器3位置低16位
 
 // 寄存器总数
-#define REGS_TOTAL_NUM    10
+#define REGS_TOTAL_NUM    256
 
 // 函数声明
 #ifdef ENABLE_HUB_SLAVE

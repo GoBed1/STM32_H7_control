@@ -4,6 +4,7 @@
 
 extern "C" {
 #include "Modbus.h"
+//extern ModbusRtu bms_led_sound_app;
 }
 
 class ModbusRtu {

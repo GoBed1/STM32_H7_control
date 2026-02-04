@@ -19,7 +19,7 @@ bool OidEncoder::requestPositionAsync()
 bool OidEncoder::requestMultiAsync()
 {
     // 位置占两个 16 位保持寄存器，从 0x0000 开始
-    return asyncReadHolding(slave_id_, 0x0002, 2, posRegs_);
+    return asyncReadHolding(0x04, 0x0000, 1, posRegs_);
 }
 
 bool OidEncoder::requestSpeedAsync()

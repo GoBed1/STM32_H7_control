@@ -236,7 +236,7 @@ void StartHeartbeatTask(void *argument)
 
    for(;;)
    {
-    // update_offline_event();
+    update_offline_event();
     HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
     
 #ifdef DEBUG_TASK_STACK

@@ -283,7 +283,9 @@ void RingClear(modbusRingBuffer_t *xRingBuffer); // flushes the ring buffer
 extern uint8_t numberHandlers; //global variable to maintain the number of concurrent handlers
 
 
+int8_t ModbusSafeReadRegister(modbusHandler_t *modH, uint16_t address, uint16_t *value);
 
+int8_t ModbusSafeWriteRegister(modbusHandler_t *modH, uint16_t address, uint16_t value);
 
 /* prototypes of the original library not implemented
 
@@ -302,3 +304,4 @@ void ModbusEnd(); //!<finish any communication and release serial communication 
 
 
 #endif /* THIRD_PARTY_MODBUS_INC_MODBUS_H_ */
+

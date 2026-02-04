@@ -32,12 +32,14 @@ public:
     uint32_t getLastPositionRaw() const; // 将两个 16 位合成为 32 位
     uint16_t getLastSpeedRaw() const;
     uint8_t getDeviceId() const { return device_id_; }
+        uint16_t posRegs_[2]{}; // 高 16 位在 posRegs_[0]，低 16 位在 posRegs_[1]
+
 
 private:
     uint8_t device_id_{0};
     uint8_t slave_id_{1};
     // 内部结果缓冲（与 ModbusRtu 发起的异步查询共享）
-    uint16_t posRegs_[2]{}; // 高 16 位在 posRegs_[0]，低 16 位在 posRegs_[1]
+   // uint16_t posRegs_[2]{}; // 高 16 位在 posRegs_[0]，低 16 位在 posRegs_[1]
     uint16_t speedReg_[1]{};
     ModbusRtuInterface *interface_;
 };

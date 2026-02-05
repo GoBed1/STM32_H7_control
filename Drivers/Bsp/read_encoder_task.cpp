@@ -625,7 +625,10 @@ void modbus_TxData_logic(void)
         // record_tx_cmd(cmd_red_com, 6);
         // YX95R_LIGHT_ON_RED_COM;
         printf(" LED on \n");
+        telegram[0].u16reg[0] = 0x0041;
         // bms_led_sound_app.asyncWriteSingle(0x01,0x00c2,0x0041);
+        ModbusQuery(&bms_sound_light_app, telegram[0]);       // make a query
+
         // StartTaskMaster();
         // 看看发出去的数据是啥sendTxBuffer
 
@@ -643,8 +646,10 @@ void modbus_TxData_logic(void)
 
         // YX95R_LIGHT_OFF;
         printf(" LED off \n");
+        telegram[0].u16reg[0]=0x0060;
 
-        bms_led_sound_app.asyncWriteSingle(0x01, 0x00c2, 0x0060);
+ModbusQuery(&bms_sound_light_app, telegram[0]); 
+        // bms_led_sound_app.asyncWriteSingle(0x01, 0x00c2, 0x0060);
         modbus_registers[STATUS_LED_SWITCH] = 0;
         // 通知RX任务：我发送了命令，你可以等待响应了！
         // xEventGroupSetBits(eg, EVENT_CMD_SENT);
@@ -795,8 +800,10 @@ void test_bms_led_task(void*arrgument)
     telegram[0].u8id = 1;                     // slave address
     telegram[0].u8fct = MB_FC_WRITE_REGISTER; // function code (this one is registers read)
     telegram[0].u16RegAdd = 0x00c2;           // start address in slave
-    telegram[0].u16CoilsNo = 0x0041;          // number of elements (coils or registers) to read
-    
+    telegram[0].u16CoilsNo = 1; 
+             // number of elements (coils or registers) to read
+    telegram[0].u16reg[0] = 0x0041; // 亮灯
+
     // bms_sound_light_app.initMaster(&huart8, NULL, 0, 500, USART_HW); // huart8为主站接口
     bms_sound_light_app.uModbusType = MB_MASTER;
     bms_sound_light_app.port =  &huart8;
@@ -815,7 +822,8 @@ void test_bms_led_task(void*arrgument)
 
     for (;;)
     {
-        ModbusQuery(&bms_sound_light_app, telegram[0]);       // make a query
+        modbus_TxData_logic();
+       
         u32NotificationValue = ulTaskNotifyTake(pdTRUE, 500); // block until query finishes or timeout
         if (u32NotificationValue)
         {

@@ -27,6 +27,10 @@ typedef enum
     BUZZER_7M = 1,
     BUZZER_3M = 2,
 } buzzer_mode_t;
+
+
+
+
 #ifdef ENABLE_HUB_MASTER
 // Master功能
 void init_encoder_forward_master(void);

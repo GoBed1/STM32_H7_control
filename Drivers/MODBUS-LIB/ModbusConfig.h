@@ -20,8 +20,9 @@
 //#define ENABLE_TCP 1
 
 /* Uncomment the following line to enable support for Modbus RTU USART DMA mode. Only tested for Nucleo144-F429ZI.  */
-//#define ENABLE_USART_DMA 1
+// #define ENABLE_USART_DMA 1
 
+#define EVENT_RFID_RX (1 << 1)  // ✅ RFID收到了命令的事件
 
 #define T35  5              // Timer T35 period (in ticks) for end frame detection.
 #define MAX_BUFFER  256	    // Maximum size for the communication buffer in bytes.

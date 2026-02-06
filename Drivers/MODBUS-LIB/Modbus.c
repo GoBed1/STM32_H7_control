@@ -27,7 +27,7 @@
 #endif
 
 #ifndef ENABLE_USART_DMA
-#define ENABLE_USART_DMA 0
+#define ENABLE_USART_DMA 1
 #endif
 
 #define bitRead(value, bit) (((value) >> (bit)) & 0x01)

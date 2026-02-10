@@ -126,12 +126,14 @@ void RFID_WriteToModbusRegs(RFIDClient *c)
 
         if (c->valid_bitmap & (1U << i))
         {
+            // 标签有效时写入数据
             modbus_registers[base + 0] = (uint16_t)(c->tags[i].uid >> 16);
             modbus_registers[base + 1] = (uint16_t)(c->tags[i].uid & 0xFFFF);
             modbus_registers[base + 2] = ((uint16_t)c->tags[i].rssi << 8) | c->tags[i].soc;
         }
         else
         {
+            // 标签无效时清零
             modbus_registers[base + 0] = 0;
             modbus_registers[base + 1] = 0;
             modbus_registers[base + 2] = 0;
@@ -151,10 +153,10 @@ void RFID_CheckOffline(RFIDClient *c)
 
         if ((uint32_t)(now - c->tags[i].last_seen_tick) > timeout)
         {
-            c->valid_bitmap &= ~(1U << i);
+            c->valid_bitmap &= ~(1U << i);//标记标签无效
             printf("RFID offline: idx=%d, UID=0x%08X\n",
                    i, (unsigned int)c->tags[i].uid);
-            memset(&c->tags[i], 0, sizeof(c->tags[i]));
+            memset(&c->tags[i], 0, sizeof(c->tags[i]));//清除标签结构体数据
         }
     }
 }
@@ -288,11 +290,6 @@ void buzzer_logic(void)
         break;
 
     case BUZZER_7M:
-        // record_tx_cmd(cmd_sound_7m_warn, 6);
-        // BUZZER_SOUND_7M_WARN;
-        // HACK
-        // bms_led_sound_app.asyncWriteSingle(0x02, 0x0008, 0x0008);
-        // frame[10] = {}
         telegram[2].u16RegAdd = 0x0008;
         telegram[2].u16reg[0] = 0x0008;
         ModbusQuery(&bms_sound_light_app, telegram[2]);
@@ -309,10 +306,6 @@ void buzzer_logic(void)
         break;
 
     default: // OFF
-        // record_tx_cmd(cmd_sound_stop, 6);
-        // BUZZER_SOUND_STOP;
-        // HACK
-        // bms_led_sound_app.asyncWriteSingle(0x02, 0x0016, 0x0001);
         telegram[2].u16RegAdd = 0x0016;
         telegram[2].u16reg[0] = 0x0001;
         ModbusQuery(&bms_sound_light_app, telegram[2]);
@@ -513,14 +506,22 @@ void RFID_master_thread(void *argument)
         if ((uxBits & EVENT_RFID_RX) != 0)
         {
             printf("Recevice rfid: ");
-            printf("modbus_reg[3] = %04X\n", modbus_registers[3]);
-            for (int i = 0; i < 12; i++)
+            printf("modbus_reg[3] = %04X (", modbus_registers[3]);
+            // 打印二进制格式
+            for (int i = 15; i >= 0; i--)
             {
-                printf("%04X ", modbus_registers[i + 4]);
-                if (i % 3 == 0)
-                    printf("\n");
+                printf("%d", (modbus_registers[3] >> i) & 1);
+                if (i % 4 == 0 && i != 0)
+                    printf(" "); // 每4位加空格分隔
             }
-            printf("\n");
+            // printf(")\n");
+            // for (int i = 0; i < 12; i++)
+            // {
+            //     printf("%04X ", modbus_registers[i + 4]);
+            //     if (i % 3 == 0)
+            //         printf("\n");
+            // }
+            // printf("\n");
             RFID_OnFrame(&RFID_client,
                          RFID_client.Rx_RFID_buf,
                          RFID_client.Rx_RFID_len);
@@ -545,7 +546,7 @@ void init_read_encoder_task()
 {
     init_ai_safy_slave();
     HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RFID_client.rx_buf, (uint16_t)sizeof(RFID_client.rx_buf));
-
+    // modbus_registers[0] = 0;
     // 初始音量调为最大
     modbus_registers[103] = 0x001E; // 30的十六进制
     now_volume = 0x1E;

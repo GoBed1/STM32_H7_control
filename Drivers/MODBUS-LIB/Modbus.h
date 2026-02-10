@@ -27,7 +27,6 @@ typedef struct {
     uint8_t  rssi;             // 第9字节
     uint8_t  soc;              // 第10字节
     TickType_t last_seen_tick; // 最近一次收到该UID的时间戳
-    uint8_t  used;             // 这个槽位是否已分配（也可以用bitmap代替）
 } RFIDTag;
 typedef struct RFIDClient
 {
@@ -39,12 +38,8 @@ typedef struct RFIDClient
 
     // 解析数据相关参数
     RFIDTag tags[RFID_MAX_TAGS];
-    uint32_t valid_bitmap;      // bit=1 表示该index已被占用/参与离线检测
-    // uint8_t index;
-    // uint32_t UID;
-    // uint8_t RSSI;
-    // uint8_t SOC;
-    // uint32_t last_time;
+    uint32_t valid_bitmap;      // 离线码：bit=1 表示该index已被占用/参与离线检测
+  
 
 } RFIDClient;
 

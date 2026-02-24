@@ -13,7 +13,7 @@
 // #define CMD_BUZZER_stop 3
 
 #define STATUS_BUZZER 101
-#define STATUS_BMS_SOC 102
+#define STATUS_BMS_BATTERY 102
 
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
@@ -71,7 +71,7 @@ static uint32_t be_u32(const uint8_t *p)
 
 // ========== 内部函数：解析RFID帧 ==========
 static int parse_frame(const uint8_t *frm, uint16_t len,
-                       uint8_t *out_rssi, uint8_t *out_soc, uint32_t *out_uid)
+                       uint8_t *out_rssi, uint8_t *out_rfid_battery, uint32_t *out_uid)
 {
     if (len < 14)
         return 0;
@@ -79,7 +79,7 @@ static int parse_frame(const uint8_t *frm, uint16_t len,
         return 0;
 
     *out_rssi = frm[7];
-    *out_soc = frm[9];
+    *out_rfid_battery = frm[9];
     *out_uid = be_u32(&frm[10]);
 
     return 1;
@@ -129,7 +129,7 @@ void RFID_WriteToModbusRegs(RFIDClient *c)
             // 标签有效时写入数据
             modbus_registers[base + 0] = (uint16_t)(c->tags[i].uid >> 16);
             modbus_registers[base + 1] = (uint16_t)(c->tags[i].uid & 0xFFFF);
-            modbus_registers[base + 2] = ((uint16_t)c->tags[i].rssi << 8) | c->tags[i].soc;
+            modbus_registers[base + 2] = ((uint16_t)c->tags[i].rssi << 8) | c->tags[i].rfid_battery;
         }
         else
         {
@@ -163,10 +163,10 @@ void RFID_CheckOffline(RFIDClient *c)
 // 3. 收到帧后更新
 void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len)
 {
-    uint8_t rssi, soc;
+    uint8_t rssi, rfid_battery;
     uint32_t uid;
 
-    if (!parse_frame(frm, len, &rssi, &soc, &uid))
+    if (!parse_frame(frm, len, &rssi, &rfid_battery, &uid))
     {
         printf("RFID parse fail\n");
         return;
@@ -189,11 +189,11 @@ void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len)
     }
 
     c->tags[idx].rssi = rssi;
-    c->tags[idx].soc = soc;
+    c->tags[idx].rfid_battery = rfid_battery;
     c->tags[idx].last_seen_tick = now;
 
-    printf("RFID update: idx=%d, UID=0x%08X, RSSI=%d, SOC=%d\n",
-           idx, (unsigned int)uid, rssi, soc);
+    printf("RFID update: idx=%d, UID=0x%08X, RSSI=%d, rfid_battery=%d\n",
+           idx, (unsigned int)uid, rssi, rfid_battery);
 }
 
 void init_ai_safy_slave(void)
@@ -459,8 +459,8 @@ void ai_safy_master_thread(void *argument)
             }
             else
             {
-                modbus_registers[STATUS_BMS_SOC] = telegram[0].u16reg[0];
-                printf("bms led sound modbus master read success,soc = %d\n", telegram[0].u16reg[0]);
+                modbus_registers[STATUS_BMS_BATTERY] = telegram[0].u16reg[0];
+                printf("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
             }
         }
         // 设置音量

@@ -22,30 +22,30 @@ extern EventGroupHandle_t eg; // 初始化事件组为NULL
  * Modbus functionality.
  * @ingroup UartHandle UART HAL handler
  */
+//在uart.manager.c中定义了HAL_UART_TxCpltCallback
+// void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
+// {
+// 	/* Modbus RTU TX callback BEGIN */
+// 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+// 	int i;
+// 	for (i = 0; i < numberHandlers; i++)
+// 	{
+// 		if (mHandlers[i]->port == huart)
+// 		{
+// 			// notify the end of TX
+// 			xTaskNotifyFromISR(mHandlers[i]->myTaskModbusAHandle, 0, eNoAction, &xHigherPriorityTaskWoken);
+// 			break;
+// 		}
+// 	}
+// 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
-{
-	/* Modbus RTU TX callback BEGIN */
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	int i;
-	for (i = 0; i < numberHandlers; i++)
-	{
-		if (mHandlers[i]->port == huart)
-		{
-			// notify the end of TX
-			xTaskNotifyFromISR(mHandlers[i]->myTaskModbusAHandle, 0, eNoAction, &xHigherPriorityTaskWoken);
-			break;
-		}
-	}
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// 	/* Modbus RTU TX callback END */
 
-	/* Modbus RTU TX callback END */
-
-	/*
-	 * Here you should implement the callback code for other UARTs not used by Modbus
-	 *
-	 * */
-}
+// 	/*
+// 	 * Here you should implement the callback code for other UARTs not used by Modbus
+// 	 *
+// 	 * */
+// }
 
 /**
  * @brief
@@ -56,40 +56,42 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
  * @ingroup UartHandle UART HAL handler
  */
 // int count11111 = 0;
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
-{
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-	// 	if(UartHandle->Instance == huart2.Instance){
-	// //		static int count = 0;
-	// 		count11111++;
 
-	// 	}
-	/* Modbus RTU RX callback BEGIN */
-	int i;
-	for (i = 0; i < numberHandlers; i++)
-	{
-		if (mHandlers[i]->port == UartHandle)
-		{
+//在uart.manager.c中定义了HAL_UART_RxCpltCallback
+// void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
+// {
+// 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+// 	// 	if(UartHandle->Instance == huart2.Instance){
+// 	// //		static int count = 0;
+// 	// 		count11111++;
 
-			if (mHandlers[i]->xTypeHW == USART_HW)
-			{
-				RingAdd(&mHandlers[i]->xBufferRX, mHandlers[i]->dataRX);
-				HAL_UART_Receive_IT(mHandlers[i]->port, &mHandlers[i]->dataRX, 1);
-				xTimerResetFromISR(mHandlers[i]->xTimerT35, &xHigherPriorityTaskWoken);
-			}
-			break;
-		}
-	}
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// 	// 	}
+// 	/* Modbus RTU RX callback BEGIN */
+// 	int i;
+// 	for (i = 0; i < numberHandlers; i++)
+// 	{
+// 		if (mHandlers[i]->port == UartHandle)
+// 		{
 
-	/* Modbus RTU RX callback END */
+// 			if (mHandlers[i]->xTypeHW == USART_HW)
+// 			{
+// 				RingAdd(&mHandlers[i]->xBufferRX, mHandlers[i]->dataRX);
+// 				HAL_UART_Receive_IT(mHandlers[i]->port, &mHandlers[i]->dataRX, 1);
+// 				xTimerResetFromISR(mHandlers[i]->xTimerT35, &xHigherPriorityTaskWoken);
+// 			}
+// 			break;
+// 		}
+// 	}
+// 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 
-	/*
-	 * Here you should implement the callback code for other UARTs not used by Modbus
-	 *
-	 *
-	 * */
-}
+// 	/* Modbus RTU RX callback END */
+
+// 	/*
+// 	 * Here you should implement the callback code for other UARTs not used by Modbus
+// 	 *
+// 	 *
+// 	 * */
+// }
 
 /*
  * DMA requires to handle callbacks for special communication modes of the HAL
@@ -97,30 +99,31 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *UartHandle)
  * handled by the HAL
  * */
 // uint16_t count222 = 0;
-void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
-{
-	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+//在uart.manager.c中定义了HAL_UARTEx_RxEventCallback
+// void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+// {
+// 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 
-	if (huart->Instance == huart2.Instance)
-	{
-		// 		static int count = 0;
-		// count222++;
-		if (RFID_client.rx_buf[0] == 0x1B && RFID_client.rx_buf[1] == 0x39 && RFID_client.rx_buf[2] == 0x01) // RFID从机
-		{
-			if (Size > 0)
-			{
+// 	if (huart->Instance == huart2.Instance)
+// 	{
+// 		// 		static int count = 0;
+// 		// count222++;
+// 		if (RFID_client.rx_buf[0] == 0x1B && RFID_client.rx_buf[1] == 0x39 && RFID_client.rx_buf[2] == 0x01) // RFID从机
+// 		{
+// 			if (Size > 0)
+// 			{
 
-				memcpy(RFID_client.Rx_RFID_buf, RFID_client.rx_buf, Size);
-				RFID_client.Rx_RFID_len = (uint8_t)Size;
-			}
+// 				memcpy(RFID_client.Rx_RFID_buf, RFID_client.rx_buf, Size);
+// 				RFID_client.Rx_RFID_len = (uint8_t)Size;
+// 			}
 
-			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RFID_client.rx_buf, (uint16_t)sizeof(RFID_client.rx_buf));
+// 			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RFID_client.rx_buf, (uint16_t)sizeof(RFID_client.rx_buf));
 
-			xEventGroupSetBitsFromISR(eg, EVENT_RFID_RX, &xHigherPriorityTaskWoken);
-		}
-	}
-	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
+// 			xEventGroupSetBitsFromISR(eg, EVENT_RFID_RX, &xHigherPriorityTaskWoken);
+// 		}
+// 	}
+// 	portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+// }
 #if ENABLE_USART_DMA == 1
 	BaseType_t xHigherPriorityTaskWoken = pdFALSE;
 	/* Modbus RTU RX callback BEGIN */

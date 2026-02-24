@@ -15,7 +15,7 @@
 #include "cmsis_os.h"
 #include "task.h"
 #include "queue.h"
-#include "timers.h"
+#include "timers.h" 
 #include "event_groups.h"
 //RFID相关参数定义
 #define RFID_MAX_TAGS      8
@@ -25,7 +25,7 @@
 typedef struct {
     uint32_t uid;              // 11~14字节拼成的UID
     uint8_t  rssi;             // 第9字节
-    uint8_t  soc;              // 第10字节
+    uint8_t  rfid_battery;              // 第10字节
     TickType_t last_seen_tick; // 最近一次收到该UID的时间戳
 } RFIDTag;
 typedef struct RFIDClient

@@ -453,6 +453,8 @@ void ai_safy_master_thread(void *argument)
     TickType_t last_10s = xTaskGetTickCount();
     TickType_t last_500ms = xTaskGetTickCount();
     TickType_t last_5s = xTaskGetTickCount();
+    // 心跳机制计时器
+    TickType_t last_heartbeat = xTaskGetTickCount();
 
     for (;;)
     {
@@ -476,14 +478,14 @@ void ai_safy_master_thread(void *argument)
                 uint16_t val = telegram[3].u16reg[0];
                 if (val != 0xFFFF)
                 {
-                    discharge_samples[discharge_idx % 20] = val;//放入缓冲容器中
+                    discharge_samples[discharge_idx % 20] = val; // 放入缓冲容器中
                     discharge_idx++;
                     if (discharge_count < 20)
                         discharge_count++;
                 }
             }
         }
-       
+
         // 每 10s 执行一次（读取电量/电流） &&   每10s执行一次平均值放入寄存器（剩余放电时间）
         if (xTaskGetTickCount() - last_10s >= pdMS_TO_TICKS(10000))
         {
@@ -501,7 +503,7 @@ void ai_safy_master_thread(void *argument)
                 printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
             }
             // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
-             if (discharge_count > 0)
+            if (discharge_count > 0)
             {
                 uint32_t sum = 0;
                 for (uint8_t i = 0; i < discharge_count; i++)
@@ -548,11 +550,38 @@ void ai_safy_master_thread(void *argument)
             (modbus_registers[STATUS_LED_SWITCH] == 1 && modbus_registers[STATUS_BUZZER] == 0) ||
             (modbus_registers[STATUS_LED_SWITCH] == 0 && modbus_registers[STATUS_BUZZER] == 1))
         {
-            modbus_registers[STATUS_WORK_MODE] = 1; // 工作状态为1，即正常工作模式
+            if (modbus_registers[STATUS_BMS_BATTERY] <= 2000)
+            {
+                modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
+            }
+            else
+            {
+
+                modbus_registers[STATUS_WORK_MODE] = 1; // 工作状态为1，即正常工作模式
+            }
         }
         else
         {
-            modbus_registers[STATUS_WORK_MODE] = 0; // 工作状态为0，即非正常工作模式
+            if (modbus_registers[STATUS_BMS_BATTERY] <= 2000)
+            {
+                modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
+            }
+            else
+            {
+
+                modbus_registers[STATUS_WORK_MODE] = 0; // 工作状态为0，即非正常工作模式
+            }
+        }
+
+        // 心跳逻辑
+        if (xTaskGetTickCount() - last_heartbeat >= pdMS_TO_TICKS(1000))
+        {
+            last_heartbeat += pdMS_TO_TICKS(1000);
+
+            // 心跳值递增并处理溢出
+            modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
+
+            printf("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
         }
 
         osDelay(500);

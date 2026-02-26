@@ -14,6 +14,9 @@
 
 #define STATUS_BUZZER 101
 #define STATUS_BMS_BATTERY 102
+#define STATUS_BMS_REMAIN_DISCHARGE_TIME 105
+#define STATUS_WORK_MODE 106
+
 
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
@@ -230,6 +233,8 @@ modbusHandler_t bms_sound_light_app;
 modbusHandler_t rfid_app;
 
 uint16_t bms_results[2] = {0};
+uint16_t remainDischargeTime_results[2] = {0};
+
 uint16_t firstVolume_results[2] = {0};
 modbus_t telegram[4];
 modbus_t telegram2[3];
@@ -426,6 +431,13 @@ void ai_safy_master_thread(void *argument)
     telegram[2].u8fct = MB_FC_WRITE_REGISTER;
     telegram[2].u16CoilsNo = 1;
 
+    //read remain discharge time
+    telegram[3].u8id = 4;
+    telegram[3].u8fct = MB_FC_READ_REGISTERS;
+    telegram[3].u16RegAdd = 0x0007;
+    telegram[3].u16CoilsNo = 1;
+    telegram[3].u16reg = remainDischargeTime_results;
+
     // read buzzer Volume
     // telegram[3].u8id = 2;
     // telegram[3].u8fct = MB_FC_READ_REGISTERS;
@@ -436,6 +448,8 @@ void ai_safy_master_thread(void *argument)
 
     TickType_t last_10s = xTaskGetTickCount();
     TickType_t last_500ms = xTaskGetTickCount();
+    TickType_t last_5s = xTaskGetTickCount();
+
 
     for (;;)
     {
@@ -446,6 +460,24 @@ void ai_safy_master_thread(void *argument)
         {
             last_500ms += pdMS_TO_TICKS(500);
             modbus_TxData_logic();
+        }
+        // 每 5s 执行一次（剩余放电时间）
+        if(xTaskGetTickCount() - last_5s >= pdMS_TO_TICKS(5000))
+        {
+            last_5s += pdMS_TO_TICKS(5000);
+            ModbusQuery(&bms_sound_light_app, telegram[3]);
+            int err1 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err1 != OP_OK_QUERY)
+            {
+                printf("bms dischange time modbus master read fail : %d \n", err1);
+            }
+            else
+            {
+                modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = telegram[3].u16reg[0];
+                printf("bms dischange time modbus master read success, remain discharge time = %d\n", telegram[3].u16reg[0]);
+            }
+
+            
         }
         // 每 10s 执行一次（读取电量/电流）
         if (xTaskGetTickCount() - last_10s >= pdMS_TO_TICKS(10000))
@@ -461,6 +493,7 @@ void ai_safy_master_thread(void *argument)
             {
                 modbus_registers[STATUS_BMS_BATTERY] = telegram[0].u16reg[0];
                 printf("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
+                printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
             }
         }
         // 设置音量
@@ -483,6 +516,19 @@ void ai_safy_master_thread(void *argument)
                 printf("BUZZER_VOLUME write fail : %d \n", err);
             }
         }
+        //判断工作状态
+        if((modbus_registers[STATUS_LED_SWITCH]==1&&modbus_registers[STATUS_BUZZER]==1) || 
+        (modbus_registers[STATUS_LED_SWITCH]==1&&modbus_registers[STATUS_BUZZER]==0) || 
+        (modbus_registers[STATUS_LED_SWITCH]==0&&modbus_registers[STATUS_BUZZER]==1))
+        {
+            modbus_registers[STATUS_WORK_MODE] = 1; // 工作状态为1，即正常工作模式
+
+        }
+        else
+        {
+            modbus_registers[STATUS_WORK_MODE] = 0; // 工作状态为0，即非正常工作模式
+        }
+
         osDelay(500);
     }
 }

@@ -17,6 +17,10 @@
 #define STATUS_BMS_REMAIN_DISCHARGE_TIME 105
 #define STATUS_WORK_MODE 106
 
+// 放电时间全局变量
+uint32_t discharge_samples[30]; // 采样20个
+uint8_t discharge_idx = 0;
+uint8_t discharge_count = 0;
 
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
@@ -156,10 +160,10 @@ void RFID_CheckOffline(RFIDClient *c)
 
         if ((uint32_t)(now - c->tags[i].last_seen_tick) > timeout)
         {
-            c->valid_bitmap &= ~(1U << i);//标记标签无效
+            c->valid_bitmap &= ~(1U << i); // 标记标签无效
             printf("RFID offline: idx=%d, UID=0x%08X\n",
                    i, (unsigned int)c->tags[i].uid);
-            memset(&c->tags[i], 0, sizeof(c->tags[i]));//清除标签结构体数据
+            memset(&c->tags[i], 0, sizeof(c->tags[i])); // 清除标签结构体数据
         }
     }
 }
@@ -431,7 +435,7 @@ void ai_safy_master_thread(void *argument)
     telegram[2].u8fct = MB_FC_WRITE_REGISTER;
     telegram[2].u16CoilsNo = 1;
 
-    //read remain discharge time
+    // read remain discharge time
     telegram[3].u8id = 4;
     telegram[3].u8fct = MB_FC_READ_REGISTERS;
     telegram[3].u16RegAdd = 0x0007;
@@ -450,21 +454,17 @@ void ai_safy_master_thread(void *argument)
     TickType_t last_500ms = xTaskGetTickCount();
     TickType_t last_5s = xTaskGetTickCount();
 
-
     for (;;)
     {
         // printf("setVolu : %d\n",modbus_registers[103]);
 
-        // 每 500ms 执行一次
+        // 每 500ms 轮询一次led & buzzer
         if (xTaskGetTickCount() - last_500ms >= pdMS_TO_TICKS(500))
         {
             last_500ms += pdMS_TO_TICKS(500);
             modbus_TxData_logic();
-        }
-        // 每 5s 执行一次（剩余放电时间）
-        if(xTaskGetTickCount() - last_5s >= pdMS_TO_TICKS(5000))
-        {
-            last_5s += pdMS_TO_TICKS(5000);
+
+            // 每500ms采样一次放电时间
             ModbusQuery(&bms_sound_light_app, telegram[3]);
             int err1 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err1 != OP_OK_QUERY)
@@ -473,13 +473,18 @@ void ai_safy_master_thread(void *argument)
             }
             else
             {
-                modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = telegram[3].u16reg[0];
-                printf("bms dischange time modbus master read success, remain discharge time = %d\n", telegram[3].u16reg[0]);
+                uint16_t val = telegram[3].u16reg[0];
+                if (val != 0xFFFF)
+                {
+                    discharge_samples[discharge_idx % 20] = val;//放入缓冲容器中
+                    discharge_idx++;
+                    if (discharge_count < 20)
+                        discharge_count++;
+                }
             }
-
-            
         }
-        // 每 10s 执行一次（读取电量/电流）
+       
+        // 每 10s 执行一次（读取电量/电流） &&   每10s执行一次平均值放入寄存器（剩余放电时间）
         if (xTaskGetTickCount() - last_10s >= pdMS_TO_TICKS(10000))
         {
             last_10s += pdMS_TO_TICKS(10000);
@@ -495,6 +500,28 @@ void ai_safy_master_thread(void *argument)
                 printf("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
                 printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
             }
+            // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
+             if (discharge_count > 0)
+            {
+                uint32_t sum = 0;
+                for (uint8_t i = 0; i < discharge_count; i++)
+                {
+                    sum += discharge_samples[i];
+                }
+                uint16_t avg = (uint16_t)(sum / discharge_count);
+                modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = avg;
+                printf("remain discharge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME]);
+            }
+            else
+            {
+                modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = 0xFFFF;
+                printf("remain discharge time: no valid sample\n");
+            }
+
+            // 清空缓冲
+            memset(discharge_samples, 0, sizeof(discharge_samples));
+            discharge_idx = 0;
+            discharge_count = 0;
         }
         // 设置音量
         now_volume = modbus_registers[103];
@@ -516,13 +543,12 @@ void ai_safy_master_thread(void *argument)
                 printf("BUZZER_VOLUME write fail : %d \n", err);
             }
         }
-        //判断工作状态
-        if((modbus_registers[STATUS_LED_SWITCH]==1&&modbus_registers[STATUS_BUZZER]==1) || 
-        (modbus_registers[STATUS_LED_SWITCH]==1&&modbus_registers[STATUS_BUZZER]==0) || 
-        (modbus_registers[STATUS_LED_SWITCH]==0&&modbus_registers[STATUS_BUZZER]==1))
+        // 判断工作状态
+        if ((modbus_registers[STATUS_LED_SWITCH] == 1 && modbus_registers[STATUS_BUZZER] == 1) ||
+            (modbus_registers[STATUS_LED_SWITCH] == 1 && modbus_registers[STATUS_BUZZER] == 0) ||
+            (modbus_registers[STATUS_LED_SWITCH] == 0 && modbus_registers[STATUS_BUZZER] == 1))
         {
             modbus_registers[STATUS_WORK_MODE] = 1; // 工作状态为1，即正常工作模式
-
         }
         else
         {

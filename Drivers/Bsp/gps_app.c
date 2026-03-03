@@ -3,8 +3,10 @@
 
 void init_gps_app(void)
 {
-   (void)uart_manage_enable_dma_recv_by_name("gps");
-    const char cfgmsg_gga[] = "$CFGMSG,0,0,1\r\n";
+    (void)uart_manage_enable_dma_recv_by_name("gps");
+
+   osDelay(1000);
+   const char cfgmsg_gga[] = "$CFGMSG,0,0,1\r\n";
     uart_manage_dma_send_by_name("gps", (uint8_t*)cfgmsg_gga, sizeof(cfgmsg_gga) - 1U);
     osDelay(10);
     const char cfgmsg_gll[] = "$CFGMSG,0,1,0\r\n";
@@ -35,7 +37,6 @@ void process_gps_app(void)
     uart_inferface_t *m_obj = uart_manage_get_obj_by_name("gps");
     if (m_obj == NULL)
     {
-        printf("0000011111111111111111111111100000000000000");
         return;
     }
 

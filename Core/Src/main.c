@@ -256,7 +256,6 @@ void Error_Handler(void)
   while (1)
   {
     counter++;
-    HAL_Delay(500);
   }
   /* USER CODE END Error_Handler_Debug */
 }

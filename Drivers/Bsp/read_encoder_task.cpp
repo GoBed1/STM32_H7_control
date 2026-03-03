@@ -455,9 +455,8 @@ void ai_safy_master_thread(void *argument)
     TickType_t last_5s = xTaskGetTickCount();
     // 心跳机制计时器
     TickType_t last_heartbeat = xTaskGetTickCount();
-
-        init_gps_app();
-
+    TickType_t last_gps = xTaskGetTickCount();
+    init_gps_app();
 
     for (;;)
     {
@@ -576,7 +575,7 @@ void ai_safy_master_thread(void *argument)
             }
         }
 
-        // 心跳逻辑
+        // 心跳逻辑 & GPS数据轮询
         if (xTaskGetTickCount() - last_heartbeat >= pdMS_TO_TICKS(1000))
         {
             last_heartbeat += pdMS_TO_TICKS(1000);
@@ -585,10 +584,11 @@ void ai_safy_master_thread(void *argument)
             modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
 
             printf("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
-        }
 
-        // 每500ms轮询一次GPS数据
-        process_gps_app();
+            // 每1s轮询一次GPS数据
+            process_gps_app();
+
+        }
 
         osDelay(500);
     }

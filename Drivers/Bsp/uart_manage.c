@@ -305,9 +305,11 @@ void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t size)
     {
       if (size > 0U)
       {
-        (void)uart_manage_recv_idle_hook(m_obj, INTERRUPT_TYPE_UART, size);
+        // (void)uart_manage_recv_idle_hook(m_obj, INTERRUPT_TYPE_UART, size);
+        lwrb_write(&m_obj->process_ring_buffer, m_obj->recv_buffer, size);
       }
-      (void)uart_manage_enable_dma_recv(huart);
+      // (void)uart_manage_enable_dma_recv(huart);
+      uart_manage_enable_dma_recv_by_name("gps");
     }
 
     for (int i = 0; i < numberHandlers; i++)

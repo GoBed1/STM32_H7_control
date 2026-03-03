@@ -16,11 +16,20 @@
 #define STATUS_BMS_BATTERY 102
 #define STATUS_BMS_REMAIN_DISCHARGE_TIME 105
 #define STATUS_WORK_MODE 106
+#define STATUS_BMS_IS_charge 107
+#define STATUS_BMS_REMAIN_CHARGE_TIME 108
+#define STATUS_BMS_TOTAL_VOLTAGE 109
+#define STATUS_BMS_TOTAL_CURRENT 110
+// ========== 内部函数：大端拼接 ==========
 
 // 放电时间全局变量
 uint32_t discharge_samples[30]; // 采样20个
 uint8_t discharge_idx = 0;
 uint8_t discharge_count = 0;
+// 充电时间全局变量
+uint32_t charge_samples[30]; // 采样20个
+uint8_t charge_idx = 0;
+uint8_t charge_count = 0;
 
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
@@ -240,7 +249,7 @@ uint16_t bms_results[2] = {0};
 uint16_t remainDischargeTime_results[2] = {0};
 
 uint16_t firstVolume_results[2] = {0};
-modbus_t telegram[4];
+modbus_t telegram[8];
 modbus_t telegram2[3];
 
 // HACK
@@ -442,6 +451,32 @@ void ai_safy_master_thread(void *argument)
     telegram[3].u16CoilsNo = 1;
     telegram[3].u16reg = remainDischargeTime_results;
 
+    // read total voltage
+    telegram[4].u8id = 4;
+    telegram[4].u8fct = MB_FC_READ_REGISTERS;
+    telegram[4].u16RegAdd = 0x0002;
+    telegram[4].u16CoilsNo = 1;
+
+    // is_charging
+    telegram[5].u8id = 4;
+    telegram[5].u8fct = MB_FC_READ_REGISTERS;
+    telegram[5].u16RegAdd = 0x000B;
+    telegram[5].u16CoilsNo = 1;
+
+    // charge remain time
+    telegram[6].u8id = 4;
+    telegram[6].u8fct = MB_FC_READ_REGISTERS;
+    telegram[6].u16RegAdd = 0x0008;
+    telegram[6].u16CoilsNo = 1;
+
+    // read total current
+    telegram[7].u8id = 4;
+    telegram[7].u8fct = MB_FC_READ_REGISTERS;
+    telegram[7].u16RegAdd = 0x0001;
+    telegram[7].u16CoilsNo = 1;
+
+    // telegram[4].u16reg = totalVoltage_results;
+
     // read buzzer Volume
     // telegram[3].u8id = 2;
     // telegram[3].u8fct = MB_FC_READ_REGISTERS;
@@ -486,6 +521,25 @@ void ai_safy_master_thread(void *argument)
                         discharge_count++;
                 }
             }
+
+            // 每500ms采样一次充电时间
+            ModbusQuery(&bms_sound_light_app, telegram[6]);
+            int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err != OP_OK_QUERY)
+            {
+                printf("bms charge time modbus master read fail : %d \n", err);
+            }
+            else
+            {
+                uint16_t val = telegram[6].u16reg[0]; // 假设充电数据在相同位置，若实际位置不同需调整
+                if (val != 0xFFFF)
+                {
+                    charge_samples[charge_idx % 20] = val; // 放入充电缓冲容器中
+                    charge_idx++;
+                    if (charge_count < 20)
+                        charge_count++;
+                }
+            }
         }
 
         // 每 10s 执行一次（读取电量/电流） &&   每10s执行一次平均值放入寄存器（剩余放电时间）
@@ -493,17 +547,60 @@ void ai_safy_master_thread(void *argument)
         {
             last_10s += pdMS_TO_TICKS(10000);
             ModbusQuery(&bms_sound_light_app, telegram[0]);
-            int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            if (err != OP_OK_QUERY)
+            int err1 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err1 != OP_OK_QUERY)
             {
-                printf("bms led sound modbus master read fail : %d \n", err);
+                printf("bms led sound modbus master read fail : %d \n", err1);
             }
             else
             {
                 modbus_registers[STATUS_BMS_BATTERY] = telegram[0].u16reg[0];
                 printf("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
-                printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
+                // printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
             }
+            // 是否在充电状态：0-否，1-是
+
+            // 总电压读取
+            ModbusQuery(&bms_sound_light_app, telegram[4]);
+            int err2 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err2 != OP_OK_QUERY)
+            {
+                printf("bms total voltage modbus master read fail : %d \n", err2);
+            }
+            else
+            {
+                modbus_registers[STATUS_BMS_TOTAL_VOLTAGE] = telegram[4].u16reg[0];
+                printf("bms total voltage = %d\n", telegram[4].u16reg[0]);
+                // printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_VOLTAGE]);
+            }
+            // 是否在充电状态：0-否，1-是
+            ModbusQuery(&bms_sound_light_app, telegram[5]);
+            int err3 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err3 != OP_OK_QUERY)
+            {
+                printf("bms charge status modbus master read fail : %d \n", err3);
+            }
+            else
+            {
+                modbus_registers[STATUS_BMS_IS_charge] = telegram[5].u16reg[0];
+                printf("bms charge status = %d\n", telegram[5].u16reg[0]);
+                // printf("work mode = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+            }
+            
+            // //总电流读取
+            // ModbusQuery(&bms_sound_light_app, telegram[7]);
+            // int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            // if (err != OP_OK_QUERY)
+            // {
+            //     printf("bms total current modbus master read fail : %d \n", err);
+            // }
+            // else
+            // {
+            //     modbus_registers[STATUS_BMS_TOTAL_CURRENT] = telegram[7].u16reg[0];
+            //     printf("bms total current = %d\n", telegram[7].u16reg[0]);
+            //     printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT]);
+            // }
+
             // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
             if (discharge_count > 0)
             {
@@ -526,6 +623,29 @@ void ai_safy_master_thread(void *argument)
             memset(discharge_samples, 0, sizeof(discharge_samples));
             discharge_idx = 0;
             discharge_count = 0;
+
+            // 每500ms采样一次充电时间，每10s执行一次平均值放入寄存器（剩余充电时间）
+            if (charge_count > 0)
+            {
+                uint32_t sum = 0;
+                for (uint8_t i = 0; i < charge_count; i++)
+                {
+                    sum += charge_samples[i];
+                }
+                uint16_t avg = (uint16_t)(sum / charge_count);
+                modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME] = avg;
+                printf("remain charge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME]);
+            }
+            else
+            {
+                modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME] = 0xFFFF;
+                printf("remain charge time: no valid sample\n");
+            }
+
+            // 清空缓冲
+            memset(charge_samples, 0, sizeof(charge_samples));
+            charge_idx = 0;
+            charge_count = 0;
         }
         // 设置音量
         now_volume = modbus_registers[103];
@@ -558,7 +678,6 @@ void ai_safy_master_thread(void *argument)
             }
             else
             {
-
                 modbus_registers[STATUS_WORK_MODE] = 1; // 工作状态为1，即正常工作模式
             }
         }
@@ -587,7 +706,6 @@ void ai_safy_master_thread(void *argument)
 
             // 每1s轮询一次GPS数据
             process_gps_app();
-
         }
 
         osDelay(500);
@@ -657,6 +775,7 @@ void init_read_encoder_task()
     // 初始音量调为最大
     modbus_registers[103] = 0x001E; // 30的十六进制
     now_volume = 0x1E;
+    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = 0x0011;
     // modbus_registers[3]=0b10000101;
     // modbus_registers[4]=0x1102;
     // modbus_registers[5]=0x5539;

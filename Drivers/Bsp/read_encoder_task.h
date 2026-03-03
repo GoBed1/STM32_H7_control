@@ -12,6 +12,8 @@ extern "C" {
 
 #include "Modbus.h"
 
+#include "gps_app.h"
+
 // extern ModbusRtu bms_led_sound_app;
 // 函数声明
 void init_read_encoder_task();

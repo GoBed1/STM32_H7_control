@@ -48,7 +48,7 @@ const osThreadAttr_t ai_safy_slave_attributes = {
 osThreadId_t ai_safy_master_handle;
 const osThreadAttr_t ai_safy_master_attributes = {
     .name = "AISafyMaster",
-    .stack_size = 1024 * 4,
+    .stack_size = 1024 * 6,
     .priority = (osPriority_t)osPriorityNormal1,
 };
 // RFID
@@ -456,6 +456,9 @@ void ai_safy_master_thread(void *argument)
     // 心跳机制计时器
     TickType_t last_heartbeat = xTaskGetTickCount();
 
+        init_gps_app();
+
+
     for (;;)
     {
         // printf("setVolu : %d\n",modbus_registers[103]);
@@ -583,6 +586,9 @@ void ai_safy_master_thread(void *argument)
 
             printf("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
         }
+
+        // 每500ms轮询一次GPS数据
+        process_gps_app();
 
         osDelay(500);
     }

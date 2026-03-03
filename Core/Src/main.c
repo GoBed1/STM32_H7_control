@@ -102,6 +102,7 @@ int main(void)
   MX_UART8_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
+  MX_UART5_Init();
   /* USER CODE BEGIN 2 */
   init_app();
   /* USER CODE END 2 */
@@ -246,6 +247,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */
+ uint32_t counter = 0;
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
@@ -253,6 +255,8 @@ void Error_Handler(void)
   __disable_irq();
   while (1)
   {
+    counter++;
+    HAL_Delay(500);
   }
   /* USER CODE END Error_Handler_Debug */
 }

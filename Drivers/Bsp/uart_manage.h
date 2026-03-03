@@ -22,6 +22,8 @@ extern "C" {
 /* Cache line size on Cortex-M7 */
 #define DCACHE_LINE_SIZE 32U
 
+#define UART_MANAGE_MAX_OBJECTS 8U
+
 extern UART_HandleTypeDef huart1;
 extern DMA_HandleTypeDef hdma_usart1_rx;
 extern DMA_HandleTypeDef hdma_usart1_tx;
@@ -33,6 +35,9 @@ extern DMA_HandleTypeDef hdma_usart1_tx;
 extern uint8_t usart1_recv_buff[USART1_RECV_BUFFER_SIZE];
 extern uint8_t usart1_send_buff[USART1_SEND_BUFFER_SIZE];
 extern uint8_t usart1_send_fifo_buff[USART1_SEND_FIFO_SIZE];
+
+typedef uint32_t (*interface_send_fn_t)(uint8_t *buf, uint16_t len);
+typedef uint32_t (*interface_recv_fn_t)(uint8_t *buf, uint16_t len);
 
 typedef uint32_t (*usart_call_back)(uint8_t *buf, uint16_t len);
 typedef struct
@@ -51,6 +56,30 @@ typedef struct
     uint8_t is_sending;
 } uart_manage_t;
 
+typedef struct uart_interface
+{
+    char name[50];
+    uint8_t idx;
+    uint8_t used;
+    UART_HandleTypeDef *uart_h;
+    DMA_HandleTypeDef *dma_h;
+
+    uint8_t *recv_buffer;
+    uint16_t recv_buffer_size;
+    uint8_t *process_buffer;
+    uint16_t process_buffer_size;
+    lwrb_t process_ring_buffer;
+    interface_recv_fn_t recv_callback;
+
+    uint8_t *send_buffer;
+    uint16_t send_buffer_size;
+    fifo_s_t send_fifo;
+    uint8_t *send_fifo_buffer;
+    uint16_t send_fifo_size;
+    uint8_t is_sending;
+    interface_send_fn_t send_callback;
+} uart_inferface_t;
+
 typedef enum
 {
     INTERRUPT_TYPE_UART = 0,
@@ -63,6 +92,14 @@ extern uart_manage_t echo_uart_manage;
 
 void echo_uart_init(void);
 void echo_process_loop(uart_manage_t *m_obj);
+
+void uart_manage_enable_dma_recv_by_name(const char *name);
+uart_inferface_t *uart_manage_get_obj_by_name(const char *name);
+int uart_manage_dma_send_by_name(const char *name, uint8_t *buf, uint16_t len);
+uart_inferface_t *uart_manage_get_obj(UART_HandleTypeDef *huart);
+int uart_manage_init_table(void);
+int uart_manage_register(uart_inferface_t *m_obj);
+
 
 #ifdef __cplusplus
 }

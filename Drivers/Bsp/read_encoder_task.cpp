@@ -573,33 +573,36 @@ void ai_safy_master_thread(void *argument)
                 printf("bms total voltage = %d\n", telegram[4].u16reg[0]);
                 // printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_VOLTAGE]);
             }
-            // 是否在充电状态：0-否，1-是
-            ModbusQuery(&bms_sound_light_app, telegram[5]);
-            int err3 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            if (err3 != OP_OK_QUERY)
+
+            // //总电流读取 && 判断是否充电状态
+            ModbusQuery(&bms_sound_light_app, telegram[7]);
+            int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err != OP_OK_QUERY)
             {
-                printf("bms charge status modbus master read fail : %d \n", err3);
+                printf("bms total current modbus master read fail : %d \n", err);
             }
             else
             {
-                modbus_registers[STATUS_BMS_IS_charge] = telegram[5].u16reg[0];
-                printf("bms charge status = %d\n", telegram[5].u16reg[0]);
-                // printf("work mode = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+                int16_t val = (int16_t)telegram[7].u16reg[0];
+                // 判断是否充电状态
+                if (val < 0)
+                {
+                    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = (uint16_t)(-val);
+                    modbus_registers[STATUS_BMS_IS_charge] = 0; // 放电状态
+                }
+                else if (val > 0)
+                {
+                    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = (uint16_t)val;
+                    modbus_registers[STATUS_BMS_IS_charge] = 1; // 充电状态
+                }
+                else
+                {
+                    modbus_registers[STATUS_BMS_IS_charge] = 2; // 无充电或放电状态
+                }
+                printf("bms charge status = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+                printf("bms total current111 = %d===%d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT], val);
+
             }
-            
-            // //总电流读取
-            // ModbusQuery(&bms_sound_light_app, telegram[7]);
-            // int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            // if (err != OP_OK_QUERY)
-            // {
-            //     printf("bms total current modbus master read fail : %d \n", err);
-            // }
-            // else
-            // {
-            //     modbus_registers[STATUS_BMS_TOTAL_CURRENT] = telegram[7].u16reg[0];
-            //     printf("bms total current = %d\n", telegram[7].u16reg[0]);
-            //     printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT]);
-            // }
 
             // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
             if (discharge_count > 0)

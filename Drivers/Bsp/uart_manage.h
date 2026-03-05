@@ -3,59 +3,19 @@
 #define UART_MANAGE_H
 
 #include "lwrb.h"
+#include <stddef.h>
 #include <stdint.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include "usart.h"
 
 #include "stm32h7xx_hal.h"
 #include "fifo.h"
 
-/* DMA buffer placement */
-#if defined(__GNUC__)
-#define DMA_BUFFER __attribute__((section(".dma_buffer"), aligned(32)))
-#else
-#define DMA_BUFFER
-#endif
-
-/* Cache line size on Cortex-M7 */
-#define DCACHE_LINE_SIZE 32U
-
-#define UART_MANAGE_MAX_OBJECTS 8U
-
-extern UART_HandleTypeDef huart1;
-extern DMA_HandleTypeDef hdma_usart1_rx;
-extern DMA_HandleTypeDef hdma_usart1_tx;
-
-#define USART1_RECV_BUFFER_SIZE 256U
-#define USART1_SEND_BUFFER_SIZE 256U
-#define USART1_SEND_FIFO_SIZE 256U
-
-extern uint8_t usart1_recv_buff[USART1_RECV_BUFFER_SIZE];
-extern uint8_t usart1_send_buff[USART1_SEND_BUFFER_SIZE];
-extern uint8_t usart1_send_fifo_buff[USART1_SEND_FIFO_SIZE];
-
 typedef uint32_t (*interface_send_fn_t)(uint8_t *buf, uint16_t len);
 typedef uint32_t (*interface_recv_fn_t)(uint8_t *buf, uint16_t len);
 
-typedef uint32_t (*usart_call_back)(uint8_t *buf, uint16_t len);
-typedef struct
-{
-    UART_HandleTypeDef *uart_h;
-    DMA_HandleTypeDef *dma_h;
-    uint16_t recv_buffer_size;
-    uint8_t *recv_buffer;
-    usart_call_back recv_callback;
-
-    uint8_t *send_buffer;
-    uint16_t send_buffer_size;
-    fifo_s_t send_fifo;
-    uint8_t *send_fifo_buffer;
-    uint16_t send_fifo_size;
-    uint8_t is_sending;
-} uart_manage_t;
-
+#define UART_MANAGE_MAX_OBJECTS 8U
 typedef struct uart_interface
 {
     char name[50];
@@ -87,19 +47,21 @@ typedef enum
     INTERRUPT_TYPE_DMA_ALL = 2
 } interrput_type;
 
-
-extern uart_manage_t echo_uart_manage;
-
-void echo_uart_init(void);
-void echo_process_loop(uart_manage_t *m_obj);
-
-void uart_manage_enable_dma_recv_by_name(const char *name);
-uart_inferface_t *uart_manage_get_obj_by_name(const char *name);
-int uart_manage_dma_send_by_name(const char *name, uint8_t *buf, uint16_t len);
 uart_inferface_t *uart_manage_get_obj(UART_HandleTypeDef *huart);
-int uart_manage_init_table(void);
-int uart_manage_register(uart_inferface_t *m_obj);
+uart_inferface_t *uart_manage_get_obj_by_name(const char *name);
 
+int uart_manage_register_interface(uart_inferface_t *m_obj);
+int uart_manage_init_table(const uart_inferface_t *table, uint16_t table_size);
+int uart_manage_set_recv_callback(UART_HandleTypeDef *huart, interface_recv_fn_t recv_callback);
+
+void uart_manage_enable_dma_recv(UART_HandleTypeDef *huart);
+void uart_manage_enable_dma_recv_by_name(const char *name);
+int uart_manage_dma_send(UART_HandleTypeDef *huart, uint8_t *buf, uint16_t len);
+int uart_manage_dma_send_by_name(const char *name, uint8_t *buf, uint16_t len);
+
+void uart_manage_send_completed_hook(UART_HandleTypeDef *huart);
+int uart_manage_write_to_recv_ring(uart_inferface_t *m_obj, uint8_t *buf, uint16_t len);
+void uart_manage_recv_idle_hook(uart_inferface_t *m_obj, interrput_type int_type, uint16_t size);
 
 #ifdef __cplusplus
 }

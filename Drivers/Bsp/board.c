@@ -64,7 +64,7 @@ void init_app(void)
   register_led("led1", LED1_PORT, LED1_PIN);
   register_led("led2", LED2_PORT, LED2_PIN);
 //注册串口表
-  uart_manage_init_table();
+  // uart_manage_init_table();
 
 
   specify_redirect_uart(&huart1);

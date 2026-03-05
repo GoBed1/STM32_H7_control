@@ -491,6 +491,7 @@ void ai_safy_master_thread(void *argument)
     // 心跳机制计时器
     TickType_t last_heartbeat = xTaskGetTickCount();
     TickType_t last_gps = xTaskGetTickCount();
+    init_uart_manage();
     config_gps_app();
 
     for (;;)

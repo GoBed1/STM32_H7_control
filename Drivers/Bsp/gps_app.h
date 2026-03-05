@@ -9,8 +9,8 @@ extern "C" {
 
 extern uart_inferface_t gps_app;
 
-void init_gps_app(void);
-void process_gps_app(void);
+void config_gps_app(void);
+void update_gps_app(void);
 
 #ifdef __cplusplus
 }

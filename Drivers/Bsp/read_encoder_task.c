@@ -20,6 +20,9 @@
 #define STATUS_BMS_REMAIN_CHARGE_TIME 108
 #define STATUS_BMS_TOTAL_VOLTAGE 109
 #define STATUS_BMS_TOTAL_CURRENT 110
+// #define STATUS_POWER_OFF_TIME   111
+// #define STATUS_POWER_ON_TIME    112
+
 // ========== 内部函数：大端拼接 ==========
 
 // 放电时间全局变量
@@ -776,6 +779,10 @@ void init_read_encoder_task()
     // 初始音量调为最大
     modbus_registers[103] = 0x001E; // 30的十六进制
     now_volume = 0x1E;
+    //关机&开机时间设置为每天的21:00-次日6:00
+    modbus_registers[STATUS_POWER_OFF_TIME] = (21 << 8) | 0;  // 21:00
+    modbus_registers[STATUS_POWER_ON_TIME]  = (6  << 8) | 0;  // 06:00
+
     modbus_registers[STATUS_BMS_TOTAL_CURRENT] = 0x0011;
     // modbus_registers[3]=0b10000101;
     // modbus_registers[4]=0x1102;

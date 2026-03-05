@@ -2,9 +2,9 @@
 #define _NMEA_H
 
 /*
- *  NMEA GPS Protocol Parser
- *  Simplified version - Protocol parsing only
- *  Supports GGA frames
+ *  NMEA GNSS Protocol Parser
+ *  Supports common standard frames:
+ *  GGA / GLL / GSA / GSV / RMC / VTG / ZDA / TXT
  */
 
 #include <stdint.h>
@@ -15,10 +15,11 @@
 #define NMEA_OK                    0   /* Success */
 #define NMEA_ERR_INVALID_INPUT    -1   /* NULL pointer or invalid buffer */
 #define NMEA_ERR_SHORT_LENGTH     -2   /* Buffer length too short */
-#define NMEA_ERR_FORMAT           -3   /* Invalid format - $GNGGA not found */
+#define NMEA_ERR_FORMAT           -3   /* Invalid format */
 #define NMEA_ERR_NO_CHECKSUM      -4   /* No checksum delimiter (*) found */
 #define NMEA_ERR_CHECKSUM_FAIL    -5   /* Checksum validation failed */
 #define NMEA_ERR_NO_FIX           -6   /* No valid fix (fix_quality = 0) */
+
 typedef struct
 {
   uint8_t  satellite;
@@ -72,5 +73,12 @@ float   nmea_convert(float raw_degrees);
 /* Parse functions - return error code (0=success, negative=error) */
 int nmea_parse(const uint8_t *buf, uint16_t len);
 int nmea_parse_gngga(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxgll(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxgsa(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxgsv(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxrmc(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxvtg(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxzda(const uint8_t *buf, uint16_t len);
+int nmea_parse_gxtxt(const uint8_t *buf, uint16_t len);
 
 #endif

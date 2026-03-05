@@ -237,7 +237,7 @@ void StartHeartbeatTask(void *argument)
    for(;;)
    {
     update_offline_event();
-    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_15);
+    HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_10);
     
 #ifdef DEBUG_TASK_STACK
     UBaseType_t stackHighWaterMark = uxTaskGetStackHighWaterMark(NULL);

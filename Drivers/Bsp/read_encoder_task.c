@@ -70,6 +70,14 @@ const osThreadAttr_t RFID_master_attributes = {
     .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
 };
+
+osThreadId_t gps_standby_handle;
+const osThreadAttr_t gps_standby_attributes = {
+    .name = "GPSStandby",
+    .stack_size = 1024 * 4,
+    .priority = (osPriority_t)osPriorityNormal1,
+};
+
 uint8_t first_findVolume = 1;
 EventGroupHandle_t eg = NULL; // 初始化事件组为NULL
 void EventGroupCreate_Init(void)
@@ -478,28 +486,14 @@ void ai_safy_master_thread(void *argument)
     telegram[7].u16RegAdd = 0x0001;
     telegram[7].u16CoilsNo = 1;
 
-    // telegram[4].u16reg = totalVoltage_results;
-
-    // read buzzer Volume
-    // telegram[3].u8id = 2;
-    // telegram[3].u8fct = MB_FC_READ_REGISTERS;
-    // telegram[3].u16RegAdd = 0x0043;
-
-    // telegram[3].u16CoilsNo = 0;
-    // telegram[3].u16reg = firstVolume_results;
-
     TickType_t last_10s = xTaskGetTickCount();
     TickType_t last_500ms = xTaskGetTickCount();
     TickType_t last_5s = xTaskGetTickCount();
     // 心跳机制计时器
     TickType_t last_heartbeat = xTaskGetTickCount();
-    TickType_t last_gps = xTaskGetTickCount();
-    init_uart_manage();
-    config_gps_app();
 
     for (;;)
     {
-        // printf("setVolu : %d\n",modbus_registers[103]);
 
         // 每 500ms 轮询一次led & buzzer
         if (xTaskGetTickCount() - last_500ms >= pdMS_TO_TICKS(500))
@@ -577,33 +571,35 @@ void ai_safy_master_thread(void *argument)
                 printf("bms total voltage = %d\n", telegram[4].u16reg[0]);
                 // printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_VOLTAGE]);
             }
-            // 是否在充电状态：0-否，1-是
-            ModbusQuery(&bms_sound_light_app, telegram[5]);
-            int err3 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            if (err3 != OP_OK_QUERY)
+
+            // //总电流读取 && 判断是否充电状态0-否，1-是
+            ModbusQuery(&bms_sound_light_app, telegram[7]);
+            int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err != OP_OK_QUERY)
             {
-                printf("bms charge status modbus master read fail : %d \n", err3);
+                printf("bms total current modbus master read fail : %d \n", err);
             }
             else
             {
-                modbus_registers[STATUS_BMS_IS_charge] = telegram[5].u16reg[0];
-                printf("bms charge status = %d\n", telegram[5].u16reg[0]);
-                // printf("work mode = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+                int16_t val = (int16_t)telegram[7].u16reg[0];
+                // 判断是否充电状态
+                if (val < 0)
+                {
+                    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = (uint16_t)(-val);
+                    modbus_registers[STATUS_BMS_IS_charge] = 0; // 放电状态
+                }
+                else if (val > 0)
+                {
+                    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = (uint16_t)val;
+                    modbus_registers[STATUS_BMS_IS_charge] = 1; // 充电状态
+                }
+                else
+                {
+                    modbus_registers[STATUS_BMS_IS_charge] = 2; // 无充电或放电状态
+                }
+                printf("bms charge status = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+                printf("bms total current111 = %d===%d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT], val);
             }
-            
-            // //总电流读取
-            // ModbusQuery(&bms_sound_light_app, telegram[7]);
-            // int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            // if (err != OP_OK_QUERY)
-            // {
-            //     printf("bms total current modbus master read fail : %d \n", err);
-            // }
-            // else
-            // {
-            //     modbus_registers[STATUS_BMS_TOTAL_CURRENT] = telegram[7].u16reg[0];
-            //     printf("bms total current = %d\n", telegram[7].u16reg[0]);
-            //     printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT]);
-            // }
 
             // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
             if (discharge_count > 0)
@@ -707,9 +703,6 @@ void ai_safy_master_thread(void *argument)
             modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
 
             printf("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
-
-            // 每1s轮询一次GPS数据
-            update_gps_app();
         }
 
         osDelay(500);
@@ -771,32 +764,43 @@ void RFID_master_thread(void *argument)
     }
 }
 
+void gps_standby_thread(void *argument)
+{
+    config_gps_app();
+    // rtc_power_init();
+    TickType_t last_gps = xTaskGetTickCount();
+    for (;;)
+    {
+        // 每1s轮询一次GPS数据
+        if (xTaskGetTickCount() - last_gps >= pdMS_TO_TICKS(5000))
+        {
+            last_gps += pdMS_TO_TICKS(5000);
+            // 每1s轮询一次GPS数据
+            update_gps_app();
+            //检测是否进入待机状态
+            // rtc_power_schedule_check();
+
+        }
+        osDelay(500);
+    }
+}
+
 void init_read_encoder_task()
 {
     init_ai_safy_slave();
+    // 串口初始化
+    init_uart_manage();
+
     HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RFID_client.rx_buf, (uint16_t)sizeof(RFID_client.rx_buf));
     // modbus_registers[0] = 0;
     // 初始音量调为最大
     modbus_registers[103] = 0x001E; // 30的十六进制
     now_volume = 0x1E;
-    //关机&开机时间设置为每天的21:00-次日6:00
-    modbus_registers[STATUS_POWER_OFF_TIME] = (21 << 8) | 0;  // 21:00
-    modbus_registers[STATUS_POWER_ON_TIME]  = (6  << 8) | 0;  // 06:00
+    // 关机&开机时间设置为每天的21:00-次日6:00
+    modbus_registers[STATUS_POWER_OFF_TIME] = (21 << 8) | 0; // 21:00
+    modbus_registers[STATUS_POWER_ON_TIME] = (6 << 8) | 0;   // 06:00
 
-    modbus_registers[STATUS_BMS_TOTAL_CURRENT] = 0x0011;
-    // modbus_registers[3]=0b10000101;
-    // modbus_registers[4]=0x1102;
-    // modbus_registers[5]=0x5539;
-    // modbus_registers[6]=0x5021;
-    // modbus_registers[7]=0x1102;
-    // modbus_registers[8]=0x5540;
-    // modbus_registers[9]=0x3221;
-    // modbus_registers[10]=0x1102;
-    // modbus_registers[11]=0x5541;
-    // modbus_registers[12]=0x4521;
-    // modbus_registers[13]=0x1102;
-    // modbus_registers[14]=0x5542;
-    // modbus_registers[15]=0x7621;
     ai_safy_master_handle = osThreadNew(ai_safy_master_thread, NULL, &ai_safy_master_attributes);
     RFID_master_handle = osThreadNew(RFID_master_thread, NULL, &RFID_master_attributes);
+    gps_standby_handle = osThreadNew(gps_standby_thread, NULL, &gps_standby_attributes);
 }

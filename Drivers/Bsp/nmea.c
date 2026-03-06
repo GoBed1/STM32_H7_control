@@ -289,7 +289,7 @@ int nmea_parse_gngga(const uint8_t *buf, uint16_t len)
 
   if (field_count < 10 || !nmea_header_match(fields[0], "GGA"))
     return NMEA_ERR_FORMAT;
-
+  
   nmea_parse_time_hms(fields[1]);
   nmea_parse_lat_lon(fields[2], fields[3], fields[4], fields[5]);
 

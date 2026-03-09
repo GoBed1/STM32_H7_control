@@ -15,7 +15,7 @@
 #define WT_GPS_UM626N 2
 #define WT_GPS_6N 3
 #ifndef GPS_TYPE_STD
-#define GPS_TYPE_STD WT_GPS_UM626N
+#define GPS_TYPE_STD WT_GPS_6N
 #endif
 // GPS是否已同步（锁星后才允许关机判断）
 uint8_t s_gps_synced = 0;
@@ -134,8 +134,9 @@ void gps_test_nmea_parser(void)
 void config_gps_app(void)
 {
     (void)uart_manage_enable_dma_recv_by_name("gps");
-
     osDelay(1000);
+    // HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_SET); // 高电平gps工作
+    // osDelay(3000);
 
 #if (GPS_TYPE_STD == WT_RTK_UM982)
     osDelay(10);
@@ -182,6 +183,9 @@ void config_gps_app(void)
     uart_manage_dma_send_by_name("gps", (uint8_t *)cfgmsg_save, sizeof(cfgmsg_save) - 1U);
     osDelay(10);
 #endif
+ HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_SET); // 高电平gps工作
+    osDelay(3000);
+
 }
 
 void update_gps_app(void)
@@ -221,8 +225,8 @@ void update_gps_app(void)
         {
             // RMC消息解析成功，检查是否有有效的时间和日期数据
             // RMC包含：UTC time (field 1) 和 Date (field 7)
-            if (g_nmea_gnss.date_year > 0 && g_nmea_gnss.date_m > 0 && g_nmea_gnss.date_d > 0)
-            {
+            // if (g_nmea_gnss.date_year > 0 && g_nmea_gnss.date_m > 0 && g_nmea_gnss.date_d > 0)
+            // {
                 LOGD("RMC: fix=%u time=%02u:%02u:%02u date=%04u-%02u-%02u\r\n",
                      g_nmea_gnss.fix_quality,
                      g_nmea_gnss.time_h,
@@ -269,11 +273,11 @@ void update_gps_app(void)
 
                 // // 更新GPS时间
                 // gps_set_unix_time(unix_seconds);
-            }
-            else
-            {
-                LOGD("RMC: Invalid date/time data\r\n");
-            }
+            // }
+            // else
+            // {
+            //     LOGD("RMC: Invalid date/time data\r\n");
+            // }
         }
     }
 }
@@ -309,8 +313,8 @@ void gps_sync_rtc_once(void)
     static uint8_t rtc_synced = 0;
     if (rtc_synced)
         return; // 已经同步过，跳过
-    if (g_nmea_gnss.fix_quality < 1)
-        return; // 还没锁星，跳过
+    // if (g_nmea_gnss.fix_quality < 1)
+    //     return; // 还没锁星，跳过
 
     RTC_TimeTypeDef sTime = {0};
     RTC_DateTypeDef sDate = {0};
@@ -395,9 +399,17 @@ void enter_standby(void)
     printf("[PWR] enter standby mode...\r\n");
     osDelay(200);
 
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);                 // 清待机标志
     __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRBF); // 清闹钟标志
-
+    __HAL_RTC_ALARM_EXTI_CLEAR_FLAG();                  // ← 新增：清EXTI挂起位
+   // 3. 清H7的唤醒标志（WUF1~WUF6，全部清掉）
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP1);
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP2);
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP3);
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP4);
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP5);
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP6);
+    // 4. 清待机/停止标志（H7用CSSF）
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);   // 实际写PWR->CPUCR的CSSF位
     HAL_PWR_EnterSTANDBYMode(); // MCU断电，只有RTC靠VBAT运行
     // 不会执行到这里
 }

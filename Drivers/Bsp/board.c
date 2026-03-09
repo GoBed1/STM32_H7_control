@@ -67,6 +67,7 @@ void init_app(void)
   // uart_manage_init_table();
 
 
+
   specify_redirect_uart(&huart1);
   printf_set_mutex(printf_create_mutex());
   printf_use_mutex(1);

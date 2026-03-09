@@ -766,13 +766,13 @@ void RFID_master_thread(void *argument)
 
 void gps_standby_thread(void *argument)
 {
-    config_gps_app();
+    // config_gps_app();
     rtc_power_init();
     for (;;)
     {
         // 每1s轮询一次GPS数据
             // 每1s轮询一次GPS数据
-            update_gps_app();
+            // update_gps_app();
             // 检测是否进入待机状态
              rtc_power_schedule_check();
         HAL_GPIO_TogglePin(GPIOD, H_B_LED_Pin);

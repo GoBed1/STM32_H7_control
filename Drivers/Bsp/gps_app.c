@@ -291,9 +291,7 @@ uint8_t rtc_is_wakeup_from_standby(void)
 void rtc_power_init(void)
 {
     // 寄存器为0说明是第一次上电，写入默认时间
-    if (modbus_registers[STATUS_POWER_OFF_TIME] == 0)
         modbus_registers[STATUS_POWER_OFF_TIME] = POWER_OFF_DEFAULT; // 21:00
-    if (modbus_registers[STATUS_POWER_ON_TIME] == 0)
         modbus_registers[STATUS_POWER_ON_TIME] = POWER_ON_DEFAULT; // 06:00
 
     // 判断是冷启动还是RTC闹钟唤醒
@@ -301,10 +299,49 @@ void rtc_power_init(void)
     {
         printf("[PWR] from standby\r\n");
         __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB); // 清标志，防止下次误判
+
+        // 唤醒时间就是 on_time，直接设给RTC
+        uint16_t on_hhmm = modbus_registers[STATUS_POWER_ON_TIME];
+        uint8_t on_h_utc = ((on_hhmm >> 8) + 24 - 8) % 24; // 北京→UTC
+        uint8_t on_m     = (uint8_t)(on_hhmm & 0xFF);
+
+        RTC_TimeTypeDef sTime = {0};
+        RTC_DateTypeDef sDate = {0};
+        sTime.Hours   = on_h_utc;
+        sTime.Minutes = on_m;
+        sTime.Seconds = 0;
+        sTime.DayLightSaving  = RTC_DAYLIGHTSAVING_NONE;
+        sTime.StoreOperation  = RTC_STOREOPERATION_RESET;
+        sDate.Year    = 26;
+        sDate.Month   = 3;
+        sDate.Date    = 9;
+        sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+
+        HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+        HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+        printf("[RTC] wakeup, RTC set to on_time UTC %02d:%02d\r\n", on_h_utc, on_m);
     }
     else
     {
         printf("[PWR] cold start\r\n");
+        // 冷启动：手动设置RTC为当前时间（UTC）
+        RTC_TimeTypeDef sTime = {0};
+        RTC_DateTypeDef sDate = {0};
+
+        sTime.Hours   = 16-8;   // UTC 08:00 = 北京时间 16:00  (x-8),x是当前时间
+        sTime.Minutes = 15;
+        sTime.Seconds = 0;
+        sTime.DayLightSaving   = RTC_DAYLIGHTSAVING_NONE;
+        sTime.StoreOperation   = RTC_STOREOPERATION_RESET;
+
+        sDate.Year    = 26;  // 2026
+        sDate.Month   = 3;
+        sDate.Date    = 9;
+        sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+
+        HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+        HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+        printf("[RTC] cold start time set\r\n");
     }
 }
 // GPS同步RTC的函数，确保只同步一次
@@ -341,33 +378,33 @@ void gps_sync_rtc_once(void)
 // 循环每10s检测
 void rtc_power_schedule_check(void)
 {
-    if (!s_gps_synced)
-        return; // GPS未同步，不判断
+    RTC_TimeTypeDef t = {0};
+    RTC_DateTypeDef d = {0};
+    HAL_RTC_GetTime(&hrtc, &t, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &d, RTC_FORMAT_BIN); // 必须读Date，否则RTC时间寄存器被锁住
 
-    // 直接读GPS解析的UTC时间
-    uint8_t beijing_h = (g_nmea_gnss.time_h + 8) % 24; // UTC→北京
-    uint8_t beijing_m = g_nmea_gnss.time_m;
+    uint8_t beijing_h = (t.Hours + 8) % 24;     // RTC存的是UTC
+    uint8_t beijing_m = t.Minutes;
     uint16_t now_hhmm = (uint16_t)((beijing_h << 8) | beijing_m);
 
-    uint16_t off_hhmm = modbus_registers[STATUS_POWER_OFF_TIME]; // reg[111]
-    uint16_t on_hhmm = modbus_registers[STATUS_POWER_ON_TIME];   // reg[112]
+    uint16_t off_hhmm = modbus_registers[STATUS_POWER_OFF_TIME];
+    uint16_t on_hhmm  = modbus_registers[STATUS_POWER_ON_TIME];
 
     printf("[PWR] beijing %02d:%02d | off=%02d:%02d on=%02d:%02d\r\n",
            beijing_h, beijing_m,
            off_hhmm >> 8, off_hhmm & 0xFF,
            on_hhmm >> 8, on_hhmm & 0xFF);
 
-    if (now_hhmm == off_hhmm) // 精确匹配
+    if (now_hhmm == off_hhmm)
     {
-        // 关闭LED和喇叭
-        modbus_registers[0] = 0;
-        modbus_registers[1] = 0;
-        modbus_registers[2] = 0;
+        modbus_registers[0]   = 0;
+        modbus_registers[1]   = 0;
+        modbus_registers[2]   = 0;
         modbus_registers[100] = 0;
         modbus_registers[101] = 0;
-        uint8_t on_h_utc = ((on_hhmm >> 8) + 24 - 8) % 24; // 北京→UTC
-        set_alarm_b(on_h_utc, (uint8_t)(on_hhmm & 0xFF));  // 设RTC闹钟
-        enter_standby();                                   // 进入待机，不返回
+        uint8_t on_h_utc = ((on_hhmm >> 8) + 24 - 8) % 24;
+        set_alarm_b(on_h_utc, (uint8_t)(on_hhmm & 0xFF));
+        enter_standby();
     }
 }
 

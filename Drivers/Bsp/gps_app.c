@@ -210,11 +210,12 @@ void update_gps_app(void)
 
     if (read_size > 0)
     {
+        LOGD("Raw GPS data (%lu bytes): %.*s\r\n", (unsigned long)read_size, (int)read_size, (const char *)to_read_buffer);
         int parse_result = nmea_parse(to_read_buffer, (uint16_t)read_size);
-        if (parse_result != NMEA_OK)
+        if (parse_result != NMEA_OK && parse_result != NMEA_ERR_NO_FIX)
         {
             LOGE("[PE%d]%.*s\r\n", parse_result, (int)read_size, (const char *)to_read_buffer);
-            gps_test_nmea_parser();
+            // gps_test_nmea_parser();
         }
         else
         {

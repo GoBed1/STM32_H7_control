@@ -61,6 +61,10 @@ void Error_Handler(void);
 #define LED1_GPIO_Port GPIOE
 #define LED2_Pin GPIO_PIN_10
 #define LED2_GPIO_Port GPIOE
+#define H_B_LED_Pin GPIO_PIN_10
+#define H_B_LED_GPIO_Port GPIOD
+#define GPS_EN_Pin GPIO_PIN_3
+#define GPS_EN_GPIO_Port GPIOD
 
 /* USER CODE BEGIN Private defines */
 

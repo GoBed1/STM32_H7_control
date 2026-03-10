@@ -97,6 +97,7 @@ static void get_FC1(modbusHandler_t *modH);
 static void get_FC3(modbusHandler_t *modH);
 static int8_t process_FC1(modbusHandler_t *modH );
 static int8_t process_FC3(modbusHandler_t *modH );
+static int8_t process_FC4(modbusHandler_t *modH );
 static int8_t process_FC5( modbusHandler_t *modH);
 static int8_t process_FC6(modbusHandler_t *modH );
 static int8_t process_FC15(modbusHandler_t *modH );
@@ -788,6 +789,8 @@ void StartTaskModbusSlave(void *argument)
 			modH->i8state = process_FC1(modH);
 			break;
 		case MB_FC_READ_INPUT_REGISTER:
+			modH->i8state = process_FC4(modH);
+    		break;
 		case MB_FC_READ_REGISTERS :
 			if (modH->u8AddressMode == ADDRESS_BROADCAST)
 			{
@@ -1944,6 +1947,24 @@ int8_t process_FC3(modbusHandler_t *modH)
     u8CopyBufferSize = modH->u8BufferSize +2;
     sendTxBuffer(modH);
 
+    return u8CopyBufferSize;
+}
+
+static int8_t process_FC4(modbusHandler_t *modH)
+{
+    uint16_t u16StartAdd = word(modH->u8Buffer[ADD_HI], modH->u8Buffer[ADD_LO]);
+    uint8_t  u8regsno    = word(modH->u8Buffer[NB_HI],  modH->u8Buffer[NB_LO]);
+    uint8_t  u8CopyBufferSize;
+
+    modH->u8Buffer[2]  = u8regsno * 2;
+    modH->u8BufferSize = 3;
+
+    for (uint16_t i = u16StartAdd; i < u16StartAdd + u8regsno; i++) {
+        modH->u8Buffer[modH->u8BufferSize++] = highByte(modH->u16inputregs[i]);
+        modH->u8Buffer[modH->u8BufferSize++] = lowByte(modH->u16inputregs[i]);
+    }
+    u8CopyBufferSize = modH->u8BufferSize + 2;
+    sendTxBuffer(modH);
     return u8CopyBufferSize;
 }
 

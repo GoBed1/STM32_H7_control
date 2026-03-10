@@ -15,7 +15,7 @@ extern "C" {
 #define REG_RESERVE_01       0x0001  // 保留
 
 #define REG_TOTAL_SENSORS 0x0002  // 传感器总数
-#define REG_ERROR_CODE    0x0003  // 错误码
+#define REG_ERROR_CODE    113  // 错误码
 
 #define REG_SENSOR1_POS_HI    0x0004  // 传感器1位置高16位
 #define REG_SENSOR1_POS_LO    0x0005  // 传感器1位置低16位

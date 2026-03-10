@@ -43,6 +43,7 @@ extern UART_HandleTypeDef huart8;
 static modbusHandler_t encoder_forward_server;
 static modbusHandler_t encoder_forward_server_backup;
 uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
+uint16_t modbus_input_registers[REGS_TOTAL_NUM] = {0};
 uint16_t now_volume;           // 假设音量寄存器地址为103
 uint16_t last_volume = 0x001E; // 初始音量为30
 
@@ -230,8 +231,8 @@ void init_ai_safy_slave(void)
 
     // HACK 设置系统信息
     modbus_registers[REG_ERROR_CODE] = 0x0000; // 清零错误码/在线状态
-    modbus_registers[REG_TOTAL_SENSORS] = 3;
-    modbus_registers[REG_SYSTEM_VERSION] = HUB_SLAVE_VERSION; // 记录系统版本号
+    // modbus_registers[REG_TOTAL_SENSORS] = 3;
+    // modbus_registers[REG_SYSTEM_VERSION] = HUB_SLAVE_VERSION; // 记录系统版本号
 
     // 配置MODBUS Slave处理器
     encoder_forward_server.uModbusType = MB_SLAVE;
@@ -240,6 +241,8 @@ void init_ai_safy_slave(void)
     encoder_forward_server.EN_Port = NULL; // 无RS485控制引脚
     encoder_forward_server.EN_Pin = 0;
     encoder_forward_server.u16regs = modbus_registers; // 保持寄存器
+    encoder_forward_server.u16inputregs = modbus_input_registers; // 输入寄存器
+
     encoder_forward_server.u16regsize = REGS_TOTAL_NUM;
     encoder_forward_server.u16timeOut = 1000; // 1秒超时
     encoder_forward_server.xTypeHW = USART_HW;

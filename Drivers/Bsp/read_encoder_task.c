@@ -42,7 +42,7 @@ extern UART_HandleTypeDef huart8;
 
 // Slave全局变量
 static modbusHandler_t encoder_forward_server;
-#define REGS_TOTAL_NUM 200
+#define REGS_TOTAL_NUM 256
 uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
 uint16_t modbus_input_registers[REGS_TOTAL_NUM] = {0};
 uint16_t now_volume;           // 假设音量寄存器地址为103
@@ -52,6 +52,7 @@ void RFID_master_thread(void *argument);
 void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len);
 void RFID_CheckOffline(RFIDClient *c);
 void RFID_WriteToModbusRegs(RFIDClient *c);
+
 osThreadId_t ai_safy_slave_handle;
 const osThreadAttr_t ai_safy_slave_attributes = {
     .name = "AISafySlave",

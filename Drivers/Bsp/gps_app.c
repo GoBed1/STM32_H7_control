@@ -183,9 +183,8 @@ void config_gps_app(void)
     uart_manage_dma_send_by_name("gps", (uint8_t *)cfgmsg_save, sizeof(cfgmsg_save) - 1U);
     osDelay(10);
 #endif
- HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_SET); // 高电平gps工作
+    HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_SET); // 高电平gps工作
     osDelay(3000);
-
 }
 
 void update_gps_app(void)
@@ -227,52 +226,52 @@ void update_gps_app(void)
             // RMC包含：UTC time (field 1) 和 Date (field 7)
             // if (g_nmea_gnss.date_year > 0 && g_nmea_gnss.date_m > 0 && g_nmea_gnss.date_d > 0)
             // {
-                LOGD("RMC: fix=%u time=%02u:%02u:%02u date=%04u-%02u-%02u\r\n",
-                     g_nmea_gnss.fix_quality,
-                     g_nmea_gnss.time_h,
-                     g_nmea_gnss.time_m,
-                     g_nmea_gnss.time_s,
-                     g_nmea_gnss.date_year,
-                     g_nmea_gnss.date_m,
-                     g_nmea_gnss.date_d);
+            LOGD("RMC: fix=%u time=%02u:%02u:%02u date=%04u-%02u-%02u\r\n",
+                 g_nmea_gnss.fix_quality,
+                 g_nmea_gnss.time_h,
+                 g_nmea_gnss.time_m,
+                 g_nmea_gnss.time_s,
+                 g_nmea_gnss.date_year,
+                 g_nmea_gnss.date_m,
+                 g_nmea_gnss.date_d);
 
-                gps_sync_rtc_once();
-                s_gps_synced = 1; // 控制关机逻辑，必须锁星后才允许判断
+            gps_sync_rtc_once();
+            s_gps_synced = 1; // 控制关机逻辑，必须锁星后才允许判断
 
-                // // 将GPS解析到的日期时间转换为Unix时间戳
-                // uint16_t year = g_nmea_gnss.date_year;
-                // uint8_t month = g_nmea_gnss.date_m;
-                // uint8_t day = g_nmea_gnss.date_d;
-                // uint8_t hour = g_nmea_gnss.time_h;
-                // uint8_t minute = g_nmea_gnss.time_m;
-                // uint8_t second = g_nmea_gnss.time_s;
+            // // 将GPS解析到的日期时间转换为Unix时间戳
+            // uint16_t year = g_nmea_gnss.date_year;
+            // uint8_t month = g_nmea_gnss.date_m;
+            // uint8_t day = g_nmea_gnss.date_d;
+            // uint8_t hour = g_nmea_gnss.time_h;
+            // uint8_t minute = g_nmea_gnss.time_m;
+            // uint8_t second = g_nmea_gnss.time_s;
 
-                // 计算Unix时间戳
-                // uint64_t days = 0;
-                // for (uint16_t y = 1970; y < year; ++y)
-                // {
-                //     bool is_leap = ((y % 4U == 0U && y % 100U != 0U) || (y % 400U == 0U));
-                //     days += is_leap ? 366ULL : 365ULL;
-                // }
+            // 计算Unix时间戳
+            // uint64_t days = 0;
+            // for (uint16_t y = 1970; y < year; ++y)
+            // {
+            //     bool is_leap = ((y % 4U == 0U && y % 100U != 0U) || (y % 400U == 0U));
+            //     days += is_leap ? 366ULL : 365ULL;
+            // }
 
-                // uint8_t dim[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-                // bool is_leap_year = ((year % 4U == 0U && year % 100U != 0U) || (year % 400U == 0U));
-                // if (is_leap_year)
-                // {
-                //     dim[1] = 29;
-                // }
+            // uint8_t dim[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+            // bool is_leap_year = ((year % 4U == 0U && year % 100U != 0U) || (year % 400U == 0U));
+            // if (is_leap_year)
+            // {
+            //     dim[1] = 29;
+            // }
 
-                // for (uint8_t m = 1; m < month; ++m)
-                // {
-                //     days += (uint64_t)dim[m - 1];
-                // }
-                // days += (uint64_t)(day - 1U);
+            // for (uint8_t m = 1; m < month; ++m)
+            // {
+            //     days += (uint64_t)dim[m - 1];
+            // }
+            // days += (uint64_t)(day - 1U);
 
-                // uint64_t sec64 = days * 86400ULL + (uint64_t)hour * 3600ULL + (uint64_t)minute * 60ULL + (uint64_t)second;
-                // uint32_t unix_seconds = (uint32_t)sec64;
+            // uint64_t sec64 = days * 86400ULL + (uint64_t)hour * 3600ULL + (uint64_t)minute * 60ULL + (uint64_t)second;
+            // uint32_t unix_seconds = (uint32_t)sec64;
 
-                // // 更新GPS时间
-                // gps_set_unix_time(unix_seconds);
+            // // 更新GPS时间
+            // gps_set_unix_time(unix_seconds);
             // }
             // else
             // {
@@ -290,21 +289,38 @@ uint8_t rtc_is_wakeup_from_standby(void)
 }
 void rtc_power_init(void)
 {
-    // 寄存器为0说明是第一次上电，写入默认时间
-    if (modbus_registers[STATUS_POWER_OFF_TIME] == 0)
-        modbus_registers[STATUS_POWER_OFF_TIME] = POWER_OFF_DEFAULT; // 21:00
-    if (modbus_registers[STATUS_POWER_ON_TIME] == 0)
-        modbus_registers[STATUS_POWER_ON_TIME] = POWER_ON_DEFAULT; // 06:00
+   modbus_registers[STATUS_POWER_OFF_TIME] = POWER_OFF_DEFAULT;
+    modbus_registers[STATUS_POWER_ON_TIME]  = POWER_ON_DEFAULT;
 
-    // 判断是冷启动还是RTC闹钟唤醒
     if (rtc_is_wakeup_from_standby())
     {
         printf("[PWR] from standby\r\n");
-        __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB); // 清标志，防止下次误判
+        __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);
+
+        // 唤醒时间就是 on_time，直接赋给RTC，保证时间基准准确
+        uint16_t on_hhmm = modbus_registers[STATUS_POWER_ON_TIME];
+        uint8_t on_h_utc = ((on_hhmm >> 8) + 24 - 8) % 24; // 北京→UTC
+        uint8_t on_m     = (uint8_t)(on_hhmm & 0xFF);
+
+        RTC_TimeTypeDef sTime = {0};
+        RTC_DateTypeDef sDate = {0};
+        sTime.Hours          = on_h_utc;
+        sTime.Minutes        = on_m;
+        sTime.Seconds        = 0;
+        sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+        sTime.StoreOperation = RTC_STOREOPERATION_RESET;
+        sDate.Year    = 26;
+        sDate.Month   = 1;
+        sDate.Date    = 1;
+        sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+        HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+        HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+        printf("[PWR] RTC set to on_time UTC %02d:%02d\r\n", on_h_utc, on_m);
     }
     else
     {
         printf("[PWR] cold start\r\n");
+        // 冷启动：等GPS同步RTC（gps_sync_rtc_once会处理）
     }
 }
 // GPS同步RTC的函数，确保只同步一次
@@ -357,7 +373,7 @@ void rtc_power_schedule_check(void)
            off_hhmm >> 8, off_hhmm & 0xFF,
            on_hhmm >> 8, on_hhmm & 0xFF);
 
-    if (now_hhmm == off_hhmm) // 精确匹配
+    if (now_hhmm == off_hhmm  ) // 精确匹配
     {
         // 关闭LED和喇叭
         modbus_registers[0] = 0;
@@ -373,6 +389,11 @@ void rtc_power_schedule_check(void)
 
 void set_alarm_b(uint8_t utc_h, uint8_t utc_m)
 {
+    // 开启 PWR 时钟 + 备份域访问（H7 必须）
+    // __HAL_RCC_PWR_CLK_ENABLE();
+    
+    HAL_PWR_EnableBkUpAccess();
+
     HAL_RTC_DeactivateAlarm(&hrtc, RTC_ALARM_B); // 先关旧闹钟
 
     RTC_AlarmTypeDef sAlarm = {0};
@@ -389,7 +410,15 @@ void set_alarm_b(uint8_t utc_h, uint8_t utc_m)
     sAlarm.AlarmDateWeekDay = 1;
     sAlarm.Alarm = RTC_ALARM_B;
 
-    HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN);
+    if (HAL_RTC_SetAlarm_IT(&hrtc, &sAlarm, RTC_FORMAT_BIN) != HAL_OK)
+    {
+        printf("[RTC] Alarm B SET FAILED!\r\n");
+        return;
+    }
+
+    __HAL_RTC_ALARM_EXTI_ENABLE_IT();
+    __HAL_RTC_ALARM_EXTI_ENABLE_RISING_EDGE();
+
     printf("[RTC] Alarm B: UTC %02d:%02d\r\n", utc_h, utc_m);
 }
 
@@ -398,10 +427,11 @@ void enter_standby(void)
 {
     printf("[PWR] enter standby mode...\r\n");
     osDelay(200);
-
+    HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_RESET); // 高电平gps工作
+osDelay(100);
     __HAL_RTC_ALARM_CLEAR_FLAG(&hrtc, RTC_FLAG_ALRBF); // 清闹钟标志
-    __HAL_RTC_ALARM_EXTI_CLEAR_FLAG();                  // ← 新增：清EXTI挂起位
-   // 3. 清H7的唤醒标志（WUF1~WUF6，全部清掉）
+    __HAL_RTC_ALARM_EXTI_CLEAR_FLAG();                 // ← 新增：清EXTI挂起位
+                                                       // 3. 清H7的唤醒标志（WUF1~WUF6，全部清掉）
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP1);
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP2);
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP3);
@@ -409,7 +439,7 @@ void enter_standby(void)
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP5);
     __HAL_PWR_CLEAR_FLAG(PWR_FLAG_WKUP6);
     // 4. 清待机/停止标志（H7用CSSF）
-    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB);   // 实际写PWR->CPUCR的CSSF位
-    HAL_PWR_EnterSTANDBYMode(); // MCU断电，只有RTC靠VBAT运行
+    __HAL_PWR_CLEAR_FLAG(PWR_FLAG_SB); // 实际写PWR->CPUCR的CSSF位
+    HAL_PWR_EnterSTANDBYMode(); 
     // 不会执行到这里
 }

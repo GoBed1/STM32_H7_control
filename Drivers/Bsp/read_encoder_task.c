@@ -39,7 +39,7 @@ extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
 extern UART_HandleTypeDef huart8;
-
+extern RTC_HandleTypeDef hrtc;
 // Slave全局变量
 static modbusHandler_t encoder_forward_server;
 #define REGS_TOTAL_NUM 256
@@ -771,6 +771,35 @@ void RFID_master_thread(void *argument)
 
 void gps_standby_thread(void *argument)
 {
+    // // ===== 临时测试：上电后1分钟进入待机，验证唤醒链路 =====
+    // printf("[TEST] standby test start\r\n");
+
+    // // 先读当前RTC时间
+    // RTC_TimeTypeDef t = {0};
+    // RTC_DateTypeDef d = {0};
+    // HAL_RTC_GetTime(&hrtc, &t, RTC_FORMAT_BIN);
+    // HAL_RTC_GetDate(&hrtc, &d, RTC_FORMAT_BIN);
+    // printf("[TEST] current RTC UTC: %02d:%02d:%02d\r\n", t.Hours, t.Minutes, t.Seconds);
+
+    // // 计算1分钟后的时间
+    // uint8_t alarm_h = t.Hours;
+    // uint8_t alarm_m = t.Minutes + 1;
+    // if (alarm_m >= 60)
+    // {
+    //     alarm_m = 0;
+    //     alarm_h = (alarm_h + 1) % 24;
+    // }
+    // printf("[TEST] alarm set to UTC: %02d:%02d\r\n", alarm_h, alarm_m);
+
+    // // 设闹钟
+    // set_alarm_b(alarm_h, alarm_m);
+
+    // // 等5秒让日志打完
+    // osDelay(10000);
+
+    // // 进入待机
+    // enter_standby();
+
     config_gps_app();
     rtc_power_init();
     for (;;)

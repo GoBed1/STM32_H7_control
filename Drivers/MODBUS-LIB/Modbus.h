@@ -210,6 +210,9 @@ typedef struct
 
     mb_address_t u8AddressMode; //!< 0=broadcast, 1..247=normal
 
+    uint16_t *u16inputregs;   // ← 新增：Input registers (FC4，只读)
+    uint16_t u16inputregsize;
+
     // FreeRTOS components
 
     // Queue Modbus Telegram

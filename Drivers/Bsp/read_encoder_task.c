@@ -1,10 +1,10 @@
 #include "read_encoder_task.h"
-#include "encoder_forward_app.h"
-#define RET_D(...) // printf(__VA_ARGS__)
-#define RET_I(...) printf(__VA_ARGS__)
-#define RET_E(...) printf(__VA_ARGS__)
+//#include "encoder_forward_app.h"
 
-#include "read_encoder_task.h"
+#define LOGD(...) // printf(__VA_ARGS__)
+#define LOGI(...) printf(__VA_ARGS__)
+#define LOGE(...) printf(__VA_ARGS__)
+
 #define CMD_LED_SWITCH 0
 #define STATUS_LED_SWITCH 100
 // 喇叭
@@ -41,7 +41,7 @@ extern UART_HandleTypeDef huart8;
 
 // Slave全局变量
 static modbusHandler_t encoder_forward_server;
-static modbusHandler_t encoder_forward_server_backup;
+#define REGS_TOTAL_NUM 200
 uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
 uint16_t now_volume;           // 假设音量寄存器地址为103
 uint16_t last_volume = 0x001E; // 初始音量为30
@@ -181,7 +181,7 @@ void RFID_CheckOffline(RFIDClient *c)
         if ((uint32_t)(now - c->tags[i].last_seen_tick) > timeout)
         {
             c->valid_bitmap &= ~(1U << i); // 标记标签无效
-            printf("RFID offline: idx=%d, UID=0x%08X\n",
+            LOGD("RFID offline: idx=%d, UID=0x%08X\n",
                    i, (unsigned int)c->tags[i].uid);
             memset(&c->tags[i], 0, sizeof(c->tags[i])); // 清除标签结构体数据
         }
@@ -195,7 +195,7 @@ void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len)
 
     if (!parse_frame(frm, len, &rssi, &rfid_battery, &uid))
     {
-        printf("RFID parse fail\n");
+        LOGD("RFID parse fail\n");
         return;
     }
 
@@ -207,19 +207,19 @@ void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len)
         idx = alloc_slot(c);
         if (idx < 0)
         {
-            printf("RFID slots full, UID=0x%08X\n", (unsigned int)uid);
+            LOGD("RFID slots full, UID=0x%08X\n", (unsigned int)uid);
             return;
         }
         c->valid_bitmap |= (1U << idx);
         c->tags[idx].uid = uid;
-        printf("RFID new tag: idx=%d, UID=0x%08X\n", idx, (unsigned int)uid);
+        LOGD("RFID new tag: idx=%d, UID=0x%08X\n", idx, (unsigned int)uid);
     }
 
     c->tags[idx].rssi = rssi;
     c->tags[idx].rfid_battery = rfid_battery;
     c->tags[idx].last_seen_tick = now;
 
-    printf("RFID update: idx=%d, UID=0x%08X, RSSI=%d, rfid_battery=%d\n",
+    LOGD("RFID update: idx=%d, UID=0x%08X, RSSI=%d, rfid_battery=%d\n",
            idx, (unsigned int)uid, rssi, rfid_battery);
 }
 
@@ -229,9 +229,9 @@ void init_ai_safy_slave(void)
     memset(modbus_registers, 0, sizeof(modbus_registers));
 
     // HACK 设置系统信息
-    modbus_registers[REG_ERROR_CODE] = 0x0000; // 清零错误码/在线状态
-    modbus_registers[REG_TOTAL_SENSORS] = 3;
-    modbus_registers[REG_SYSTEM_VERSION] = HUB_SLAVE_VERSION; // 记录系统版本号
+//    modbus_registers[REG_ERROR_CODE] = 0x0000; // 清零错误码/在线状态
+//    modbus_registers[REG_TOTAL_SENSORS] = 3;
+//    modbus_registers[REG_SYSTEM_VERSION] = HUB_SLAVE_VERSION; // 记录系统版本号
 
     // 配置MODBUS Slave处理器
     encoder_forward_server.uModbusType = MB_SLAVE;
@@ -243,13 +243,13 @@ void init_ai_safy_slave(void)
     encoder_forward_server.u16regsize = REGS_TOTAL_NUM;
     encoder_forward_server.u16timeOut = 1000; // 1秒超时
     encoder_forward_server.xTypeHW = USART_HW;
-    RET_I("MODBUS-RTU Slave ID: %d\r\n", FORWARD_SLAVE_ADDR);
+    LOGI("MODBUS-RTU Slave ID: %d\r\n", FORWARD_SLAVE_ADDR);
 
     // 初始化MODBUS Slave
     ModbusInit(&encoder_forward_server);
     ModbusStart(&encoder_forward_server);
 
-    RET_I("Register range: 0x0000-0x%04X (%d registers)\r\n",
+    LOGI("Register range: 0x0000-0x%04X (%d registers)\r\n",
           REGS_TOTAL_NUM - 1, REGS_TOTAL_NUM);
 }
 
@@ -309,11 +309,11 @@ void buzzer_logic(void)
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
-            printf("BUZZER_3M write fail : %d \n", err);
+            LOGD("BUZZER_3M write fail : %d \n", err);
         }
         else
         {
-            printf("BUZZER_3M write success\n");
+            LOGD("BUZZER_3M write success\n");
         }
         modbus_registers[STATUS_BUZZER] = 1;
         break;
@@ -325,11 +325,11 @@ void buzzer_logic(void)
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
-            printf("BUZZER_7M write fail : %d \n", err);
+            LOGD("BUZZER_7M write fail : %d \n", err);
         }
         else
         {
-            printf("BUZZER_7M write success\n");
+            LOGD("BUZZER_7M write success\n");
         }
         modbus_registers[STATUS_BUZZER] = 1;
         break;
@@ -341,11 +341,11 @@ void buzzer_logic(void)
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err != OP_OK_QUERY)
         {
-            printf("BUZZER_SOUND_STOP write fail : %d \n", err);
+            LOGD("BUZZER_SOUND_STOP write fail : %d \n", err);
         }
         else
         {
-            printf("BUZZER_SOUND_STOP write success\n");
+            LOGD("BUZZER_SOUND_STOP write success\n");
         }
         modbus_registers[STATUS_BUZZER] = 0;
         break;
@@ -365,7 +365,7 @@ void modbus_TxData_logic(void)
         // 记录超时或者crc校验重复发送命令的逻辑
         // record_tx_cmd(cmd_red_com, 6);
         // YX95R_LIGHT_ON_RED_COM;
-        printf(" LED on \n");
+        LOGD(" LED on \n");
         // bms_led_sound_app.asyncWriteSingle(0x01,0x00c2,0x0041);
         telegram[1].u16RegAdd = 0x00C2;
         telegram[1].u16reg[0] = 0x0041;
@@ -373,11 +373,11 @@ void modbus_TxData_logic(void)
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
-            printf("LED on write fail : %d \n", err);
+            LOGD("LED on write fail : %d \n", err);
         }
         else
         {
-            printf("LED on write success\n");
+            LOGD("LED on write success\n");
         }
 
         // 更新状态寄存器regs[100]且清除命令寄存器regs[0]
@@ -392,7 +392,7 @@ void modbus_TxData_logic(void)
         // record_tx_cmd(cmd_off, 6);
 
         // YX95R_LIGHT_OFF;
-        printf(" LED off \n");
+        LOGD(" LED off \n");
         // HACK
         // bms_led_sound_app.asyncWriteSingle(0x01, 0x00c2, 0x0060);
         telegram[1].u16RegAdd = 0x00C2;
@@ -401,11 +401,11 @@ void modbus_TxData_logic(void)
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
-            printf("LED on write fail : %d \n", err);
+            LOGD("LED on write fail : %d \n", err);
         }
         else
         {
-            printf("LED on write success\n");
+            LOGD("LED on write success\n");
         }
         modbus_registers[STATUS_LED_SWITCH] = 0;
         // 通知RX任务：我发送了命令，你可以等待响应了！
@@ -436,7 +436,7 @@ void ai_safy_master_thread(void *argument)
     ModbusInit(&bms_sound_light_app);
     ModbusStart(&bms_sound_light_app);
 
-    printf("bms sound light modbus master start \n");
+    LOGD("bms sound light modbus master start \n");
 
     // read bms
     telegram[0].u8id = 4;
@@ -506,7 +506,7 @@ void ai_safy_master_thread(void *argument)
             int err1 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err1 != OP_OK_QUERY)
             {
-                printf("bms dischange time modbus master read fail : %d \n", err1);
+                LOGD("bms dischange time modbus master read fail : %d \n", err1);
             }
             else
             {
@@ -525,7 +525,7 @@ void ai_safy_master_thread(void *argument)
             int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err != OP_OK_QUERY)
             {
-                printf("bms charge time modbus master read fail : %d \n", err);
+                LOGD("bms charge time modbus master read fail : %d \n", err);
             }
             else
             {
@@ -548,13 +548,13 @@ void ai_safy_master_thread(void *argument)
             int err1 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err1 != OP_OK_QUERY)
             {
-                printf("bms led sound modbus master read fail : %d \n", err1);
+                LOGD("bms led sound modbus master read fail : %d \n", err1);
             }
             else
             {
                 modbus_registers[STATUS_BMS_BATTERY] = telegram[0].u16reg[0];
-                printf("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
-                // printf("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
+                LOGD("bms led sound modbus master read success,Battery = %d\n", telegram[0].u16reg[0]);
+                // LOGD("work mode = %d\n", modbus_registers[STATUS_WORK_MODE]);
             }
             // 是否在充电状态：0-否，1-是
 
@@ -563,13 +563,13 @@ void ai_safy_master_thread(void *argument)
             int err2 = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err2 != OP_OK_QUERY)
             {
-                printf("bms total voltage modbus master read fail : %d \n", err2);
+                LOGD("bms total voltage modbus master read fail : %d \n", err2);
             }
             else
             {
                 modbus_registers[STATUS_BMS_TOTAL_VOLTAGE] = telegram[4].u16reg[0];
-                printf("bms total voltage = %d\n", telegram[4].u16reg[0]);
-                // printf("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_VOLTAGE]);
+                LOGD("bms total voltage = %d\n", telegram[4].u16reg[0]);
+                // LOGD("work mode = %d\n", modbus_registers[STATUS_BMS_TOTAL_VOLTAGE]);
             }
 
             // //总电流读取 && 判断是否充电状态0-否，1-是
@@ -577,7 +577,7 @@ void ai_safy_master_thread(void *argument)
             int err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err != OP_OK_QUERY)
             {
-                printf("bms total current modbus master read fail : %d \n", err);
+                LOGD("bms total current modbus master read fail : %d \n", err);
             }
             else
             {
@@ -597,8 +597,8 @@ void ai_safy_master_thread(void *argument)
                 {
                     modbus_registers[STATUS_BMS_IS_charge] = 2; // 无充电或放电状态
                 }
-                printf("bms charge status = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
-                printf("bms total current111 = %d===%d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT], val);
+                LOGD("bms charge status = %d\n", modbus_registers[STATUS_BMS_IS_charge]);
+                LOGD("bms total current111 = %d===%d\n", modbus_registers[STATUS_BMS_TOTAL_CURRENT], val);
             }
 
             // 每500ms采样一次放电时间，每10s执行一次平均值放入寄存器（剩余放电时间）
@@ -611,12 +611,12 @@ void ai_safy_master_thread(void *argument)
                 }
                 uint16_t avg = (uint16_t)(sum / discharge_count);
                 modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = avg;
-                printf("remain discharge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME]);
+                LOGD("remain discharge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME]);
             }
             else
             {
                 modbus_registers[STATUS_BMS_REMAIN_DISCHARGE_TIME] = 0xFFFF;
-                printf("remain discharge time: no valid sample\n");
+                LOGD("remain discharge time: no valid sample\n");
             }
 
             // 清空缓冲
@@ -634,12 +634,12 @@ void ai_safy_master_thread(void *argument)
                 }
                 uint16_t avg = (uint16_t)(sum / charge_count);
                 modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME] = avg;
-                printf("remain charge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME]);
+                LOGD("remain charge time avg (5s) = %d min\n", modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME]);
             }
             else
             {
                 modbus_registers[STATUS_BMS_REMAIN_CHARGE_TIME] = 0xFFFF;
-                printf("remain charge time: no valid sample\n");
+                LOGD("remain charge time: no valid sample\n");
             }
 
             // 清空缓冲
@@ -659,12 +659,12 @@ void ai_safy_master_thread(void *argument)
             uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err == OP_OK_QUERY)
             {
-                printf("BUZZER_VOLUME write success, lastvolume=%d , nowVolume=%d,modbusReg[103]:%d\n", last_volume, now_volume, modbus_registers[103]);
+                LOGD("BUZZER_VOLUME write success, lastvolume=%d , nowVolume=%d,modbusReg[103]:%d\n", last_volume, now_volume, modbus_registers[103]);
                 last_volume = now_volume; // 更新上一次的音量记录以供下次比较使用。
             }
             else
             {
-                printf("BUZZER_VOLUME write fail : %d \n", err);
+                LOGD("BUZZER_VOLUME write fail : %d \n", err);
             }
         }
         // 判断工作状态
@@ -702,7 +702,7 @@ void ai_safy_master_thread(void *argument)
             // 心跳值递增并处理溢出
             modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
 
-            printf("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
+            LOGD("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
         }
 
         osDelay(500);
@@ -727,23 +727,23 @@ void RFID_master_thread(void *argument)
         );
         if ((uxBits & EVENT_RFID_RX) != 0)
         {
-            printf("Recevice rfid: ");
-            printf("modbus_reg[3] = %04X (", modbus_registers[3]);
+            LOGD("Recevice rfid: ");
+            LOGD("modbus_reg[3] = %04X (", modbus_registers[3]);
             // 打印二进制格式
             for (int i = 15; i >= 0; i--)
             {
-                printf("%d", (modbus_registers[3] >> i) & 1);
+                LOGD("%d", (modbus_registers[3] >> i) & 1);
                 if (i % 4 == 0 && i != 0)
-                    printf(" "); // 每4位加空格分隔
+                    LOGD(" "); // 每4位加空格分隔
             }
-            // printf(")\n");
+            // LOGD(")\n");
             // for (int i = 0; i < 12; i++)
             // {
-            //     printf("%04X ", modbus_registers[i + 4]);
+            //     LOGD("%04X ", modbus_registers[i + 4]);
             //     if (i % 3 == 0)
-            //         printf("\n");
+            //         LOGD("\n");
             // }
-            // printf("\n");
+            // LOGD("\n");
             RFID_OnFrame(&RFID_client,
                          RFID_client.Rx_RFID_buf,
                          RFID_client.Rx_RFID_len);

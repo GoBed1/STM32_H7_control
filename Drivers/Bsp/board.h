@@ -10,14 +10,10 @@ extern "C"
 {
 #endif
 
-
 #define MUTEX_DECLARE(mutex) unsigned long mutex
 #define MUTEX_INIT(mutex)    do{mutex = 0;}while(0)
 #define MUTEX_LOCK(mutex)    do{__disable_irq();}while(0)
 #define MUTEX_UNLOCK(mutex)  do{__enable_irq();}while(0)
-
-
-
 
 /* Hardware Configuration */
 #define LED1_PORT GPIOE
@@ -59,7 +55,6 @@ extern "C"
 #endif // ENABLE_ENCODER_TASK
 
   uint32_t get_time_ms(void);
-  void show_heartbeat(void);
   void init_app(void);
 
 #ifdef __cplusplus

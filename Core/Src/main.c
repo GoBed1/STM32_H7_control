@@ -124,9 +124,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    printf("We should never get here as control is now taken by the scheduler\r\n");
-    show_heartbeat();
-    HAL_Delay(1000);
+    Error_Handler();
   }
   /* USER CODE END 3 */
 }

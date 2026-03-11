@@ -28,7 +28,6 @@
 /* USER CODE BEGIN Includes */
 #include "board.h"
 #include "printf_redirect.h"
-#include "async_logger.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/

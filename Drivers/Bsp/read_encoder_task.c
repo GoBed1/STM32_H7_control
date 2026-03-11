@@ -22,6 +22,7 @@
 #define STATUS_BMS_TOTAL_CURRENT 110
 // #define STATUS_POWER_OFF_TIME   111
 // #define STATUS_POWER_ON_TIME    112
+#define REG_ERROR_CODE    113  // 错误码
 
 // ========== 内部函数：大端拼接 ==========
 

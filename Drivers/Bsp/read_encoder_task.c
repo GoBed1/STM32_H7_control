@@ -771,6 +771,7 @@ void RFID_master_thread(void *argument)
 
 void gps_standby_thread(void *argument)
 {
+    
     config_gps_app();
     rtc_power_init();
     // run_10_oclock_standby_test();
@@ -788,6 +789,8 @@ void gps_standby_thread(void *argument)
         rtc_power_schedule_check();
 
         HAL_GPIO_TogglePin(GPIOD, H_B_LED_Pin);
+        // HAL_GPIO_TogglePin(RELAY_1_PIN_GPIO_Port, RELAY_1_PIN_Pin);
+
         osDelay(1000);
     }
 }
@@ -809,6 +812,8 @@ void init_read_encoder_task()
     // modbus_registers[STATUS_POWER_ON_TIME] = (6 << 8) | 0;   // 06:00
 
     // HAL_GPIO_TogglePin(GPIOD, GPS_EN_Pin);
+    HAL_GPIO_WritePin(RELAY_1_PIN_GPIO_Port, RELAY_1_PIN_Pin, GPIO_PIN_SET);
+    HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
 
     ai_safy_master_handle = osThreadNew(ai_safy_master_thread, NULL, &ai_safy_master_attributes);
     RFID_master_handle = osThreadNew(RFID_master_thread, NULL, &RFID_master_attributes);

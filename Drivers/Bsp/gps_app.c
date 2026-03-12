@@ -252,7 +252,7 @@ void update_gps_app(void)
                  g_nmea_gnss.date_d);
 
             gps_sync_rtc_once();
-            s_gps_synced = 1; // 控制关机逻辑，必须锁星后才允许判断
+           
 
            
         }
@@ -285,12 +285,34 @@ void rtc_power_init(void)
         // 冷启动：等GPS同步RTC（gps_sync_rtc_once会处理）
     }
 }
+void print_internal_rtc_time(void)
+{
+    RTC_TimeTypeDef sTime = {0};
+    RTC_DateTypeDef sDate = {0};
+
+    // 注意：必须先调用 GetTime，再调用 GetDate！这是 STM32 硬件影子寄存器的要求。
+    HAL_RTC_GetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
+    HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+    // 将 RTC 的 UTC 时间转换为北京时间 (UTC+8)
+    uint8_t beijing_h = (sTime.Hours + 8) % 24;
+
+    // 考虑到跨天情况，简单处理：如果 beijing_h < 8，说明跨到了第二天。
+    // 为了日志简洁，这里暂不对 Date 进行 +1 天的复杂计算，仅打印时间。
+    
+    printf("is real write into RTC: 20%02u-%02u-%02u %02u:%02u:%02u | Beijing Time: %02u:%02u:%02u\r\n",
+           sDate.Year, sDate.Month, sDate.Date,
+           sTime.Hours, sTime.Minutes, sTime.Seconds,
+           beijing_h, sTime.Minutes, sTime.Seconds);
+}
 // GPS同步RTC的函数，确保只同步一次
 void gps_sync_rtc_once(void)
 {
     static uint8_t rtc_synced = 0;
-    if (rtc_synced)
-        return; // 已经同步过，跳过
+    if (rtc_synced){
+        // 已经同步过，跳过
+        return;
+    }
     // if (g_nmea_gnss.fix_quality < 1)
     //     return; // 还没锁星，跳过
 
@@ -303,22 +325,28 @@ void gps_sync_rtc_once(void)
     sTime.DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
     sTime.StoreOperation = RTC_STOREOPERATION_RESET;
 
-    sDate.Year = (uint8_t)(g_nmea_gnss.date_year - 2000); // 2026→26
-    sDate.Month = g_nmea_gnss.date_m;
-    sDate.Date = g_nmea_gnss.date_d;
-    sDate.WeekDay = RTC_WEEKDAY_MONDAY;
+    // sDate.Year = (uint8_t)(g_nmea_gnss.date_year - 2000); // 2026→26
+    // sDate.Month = g_nmea_gnss.date_m;
+    // sDate.Date = g_nmea_gnss.date_d;
+    // sDate.WeekDay = RTC_WEEKDAY_MONDAY;
 
     HAL_RTC_SetTime(&hrtc, &sTime, RTC_FORMAT_BIN);
-    HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+    // HAL_RTC_SetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+
+print_internal_rtc_time();
+    osDelay(100); // 确保RTC寄存器稳定
 
     rtc_synced = 1;
+     s_gps_synced = 1; // 控制关机逻辑，必须锁星后才允许判断
    
 }
 // 循环每10s检测
 void rtc_power_schedule_check(void)
 {
-    if (!s_gps_synced)
+    if (!s_gps_synced){
+        
         return; // GPS未同步，不判断
+    }
 
     // 直接读GPS解析的UTC时间
     uint8_t beijing_h = (g_nmea_gnss.time_h + 8) % 24; // UTC→北京

@@ -771,47 +771,19 @@ void RFID_master_thread(void *argument)
 
 void gps_standby_thread(void *argument)
 {
-    // // ===== 临时测试：上电后1分钟进入待机，验证唤醒链路 =====
-    // printf("[TEST] standby test start\r\n");
-
-    // // 先读当前RTC时间
-    // RTC_TimeTypeDef t = {0};
-    // RTC_DateTypeDef d = {0};
-    // HAL_RTC_GetTime(&hrtc, &t, RTC_FORMAT_BIN);
-    // HAL_RTC_GetDate(&hrtc, &d, RTC_FORMAT_BIN);
-    // printf("[TEST] current RTC UTC: %02d:%02d:%02d\r\n", t.Hours, t.Minutes, t.Seconds);
-
-    // // 计算1分钟后的时间
-    // uint8_t alarm_h = t.Hours;
-    // uint8_t alarm_m = t.Minutes + 1;
-    // if (alarm_m >= 60)
-    // {
-    //     alarm_m = 0;
-    //     alarm_h = (alarm_h + 1) % 24;
-    // }
-    // printf("[TEST] alarm set to UTC: %02d:%02d\r\n", alarm_h, alarm_m);
-
-    // // 设闹钟
-    // set_alarm_b(alarm_h, alarm_m);
-
-    // // 等5秒让日志打完
-    // osDelay(10000);
-
-    // // 进入待机
-    // enter_standby();
-
-    // config_gps_app();
+    config_gps_app();
     rtc_power_init();
-    run_10_oclock_standby_test();
+    // run_10_oclock_standby_test();
+
     for (;;)
     {
 
         // 每1s轮询一次GPS数据
         // 每1s轮询一次GPS数据
-        // update_gps_app();
+        update_gps_app();
         // // 检测是否进入待机状态
         // run_10_oclock_standby_test();
-        update_gps_time_loop();
+        // update_gps_time_loop();
 
         rtc_power_schedule_check();
 

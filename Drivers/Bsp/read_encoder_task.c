@@ -1,5 +1,5 @@
 #include "read_encoder_task.h"
-//#include "encoder_forward_app.h"
+// #include "encoder_forward_app.h"
 
 #define LOGD(...) // printf(__VA_ARGS__)
 #define LOGI(...) printf(__VA_ARGS__)
@@ -22,7 +22,7 @@
 #define STATUS_BMS_TOTAL_CURRENT 110
 // #define STATUS_POWER_OFF_TIME   111
 // #define STATUS_POWER_ON_TIME    112
-#define REG_ERROR_CODE    113  // 错误码
+#define REG_ERROR_CODE 113 // 错误码
 
 // ========== 内部函数：大端拼接 ==========
 
@@ -34,7 +34,7 @@ uint8_t discharge_count = 0;
 uint32_t charge_samples[30]; // 采样20个
 uint8_t charge_idx = 0;
 uint8_t charge_count = 0;
-
+// extern nmea_gnss_t g_nmea_gnss;
 extern UART_HandleTypeDef huart7;
 extern UART_HandleTypeDef huart2;
 extern UART_HandleTypeDef huart3;
@@ -185,7 +185,7 @@ void RFID_CheckOffline(RFIDClient *c)
         {
             c->valid_bitmap &= ~(1U << i); // 标记标签无效
             LOGD("RFID offline: idx=%d, UID=0x%08X\n",
-                   i, (unsigned int)c->tags[i].uid);
+                 i, (unsigned int)c->tags[i].uid);
             memset(&c->tags[i], 0, sizeof(c->tags[i])); // 清除标签结构体数据
         }
     }
@@ -223,7 +223,7 @@ void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len)
     c->tags[idx].last_seen_tick = now;
 
     LOGD("RFID update: idx=%d, UID=0x%08X, RSSI=%d, rfid_battery=%d\n",
-           idx, (unsigned int)uid, rssi, rfid_battery);
+         idx, (unsigned int)uid, rssi, rfid_battery);
 }
 
 void init_ai_safy_slave(void)
@@ -242,7 +242,7 @@ void init_ai_safy_slave(void)
     encoder_forward_server.port = &huart7;
     encoder_forward_server.EN_Port = NULL; // 无RS485控制引脚
     encoder_forward_server.EN_Pin = 0;
-    encoder_forward_server.u16regs = modbus_registers; // 保持寄存器
+    encoder_forward_server.u16regs = modbus_registers;            // 保持寄存器
     encoder_forward_server.u16inputregs = modbus_input_registers; // 输入寄存器
 
     encoder_forward_server.u16regsize = REGS_TOTAL_NUM;
@@ -255,7 +255,7 @@ void init_ai_safy_slave(void)
     ModbusStart(&encoder_forward_server);
 
     LOGI("Register range: 0x0000-0x%04X (%d registers)\r\n",
-          REGS_TOTAL_NUM - 1, REGS_TOTAL_NUM);
+         REGS_TOTAL_NUM - 1, REGS_TOTAL_NUM);
 }
 
 modbusHandler_t bms_sound_light_app;
@@ -800,15 +800,21 @@ void gps_standby_thread(void *argument)
     // // 进入待机
     // enter_standby();
 
-    config_gps_app();
+    // config_gps_app();
     rtc_power_init();
+    run_10_oclock_standby_test();
     for (;;)
     {
+
         // 每1s轮询一次GPS数据
-            // 每1s轮询一次GPS数据
-            update_gps_app();
-            // 检测是否进入待机状态
-             rtc_power_schedule_check();
+        // 每1s轮询一次GPS数据
+        // update_gps_app();
+        // // 检测是否进入待机状态
+        // run_10_oclock_standby_test();
+        update_gps_time_loop();
+
+        rtc_power_schedule_check();
+
         HAL_GPIO_TogglePin(GPIOD, H_B_LED_Pin);
         osDelay(1000);
     }
@@ -820,7 +826,6 @@ void init_read_encoder_task()
     init_ai_safy_slave();
     // 串口初始化
     init_uart_manage();
- 
 
     HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RFID_client.rx_buf, (uint16_t)sizeof(RFID_client.rx_buf));
     // modbus_registers[0] = 0;

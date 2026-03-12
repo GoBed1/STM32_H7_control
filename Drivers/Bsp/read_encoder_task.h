@@ -11,7 +11,7 @@ extern "C" {
 #include "task.h"
 #include "Modbus.h"
 #include "gps_app.h"
-
+#include "nmea.h"
 void init_read_encoder_task();
 typedef enum
 {

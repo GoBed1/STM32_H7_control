@@ -10,8 +10,8 @@ extern "C" {
 // reg[112]：开机时间，例如0x0600=06:00
 #define STATUS_POWER_OFF_TIME   111
 #define STATUS_POWER_ON_TIME    112
-#define POWER_OFF_DEFAULT       ((18 << 8) | 10)
-#define POWER_ON_DEFAULT        ((18  << 8) | 11)
+#define POWER_OFF_DEFAULT       ((10 << 8) | 1)
+#define POWER_ON_DEFAULT        ((10  << 8) | 2)
 
 extern uart_inferface_t gps_app;
 
@@ -20,6 +20,8 @@ void update_gps_app(void);
 void rtc_power_init(void);
 void rtc_power_schedule_check(void);
 uint8_t rtc_is_wakeup_from_standby(void);
+void gps_test_nmea_parser(void);
+void update_gps_time_loop(void);
 #ifdef __cplusplus
 }
 #endif

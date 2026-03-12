@@ -2442,7 +2442,10 @@ __WEAK void vApplicationDaemonTaskStartupHook (void){}
 __WEAK void vApplicationStackOverflowHook (TaskHandle_t xTask, signed char *pcTaskName) {
   (void)xTask;
   (void)pcTaskName;
-  configASSERT(0);
+  // configASSERT(0);
+   taskDISABLE_INTERRUPTS();
+  NVIC_SystemReset();
+  while(1){}
 }
 #endif
 

@@ -10,8 +10,8 @@ extern "C" {
 // reg[112]：开机时间，例如0x0600=06:00
 #define STATUS_POWER_OFF_TIME   111
 #define STATUS_POWER_ON_TIME    112
-#define POWER_OFF_DEFAULT       ((15 << 8) | 39)
-#define POWER_ON_DEFAULT        ((15  << 8) | 40)
+#define POWER_OFF_DEFAULT       ((12 << 8) | 10)
+#define POWER_ON_DEFAULT        ((12  << 8) | 12)
 
 extern uart_inferface_t gps_app;
 

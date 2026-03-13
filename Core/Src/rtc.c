@@ -58,7 +58,11 @@ void MX_RTC_Init(void)
   }
 
   /* USER CODE BEGIN Check_RTC_BKUP */
-
+// 1. 必须先解锁备份域访问权限，否则读不出来真实数据！
+  HAL_PWR_EnableBkUpAccess();
+  // 2. 如果备份域1的值不是 0x5AA5，说明电池没电或首次上电，才允许初始化时间
+  if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) != 0x5AA5)
+  {
   /* USER CODE END Check_RTC_BKUP */
 
   /** Initialize RTC and set the Time and Date
@@ -99,7 +103,7 @@ void MX_RTC_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN RTC_Init 2 */
-
+  }
   /* USER CODE END RTC_Init 2 */
 
 }

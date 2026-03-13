@@ -438,6 +438,21 @@ void set_alarm_b(uint8_t utc_h, uint8_t utc_m)
 // 进入待机，不返回
 void enter_standby(void)
 {
+    // ================== 安全校验防线 ==================
+    // 1. Check if the backup domain data is still there?
+    if (HAL_RTCEx_BKUPRead(&hrtc, RTC_BKP_DR1) != 0x5AA5)
+    {
+        printf("[PWR-ERR] Backup domain invalid! Magic number lost.\r\n");
+        s_gps_synced = 0; // 取消同步标志
+        return;           // 拒绝休眠，退回去继续等 GPS 信号
+    }
+
+    // 2. Check the system's global synchronization flag bit (double insurance)
+    if (!s_gps_synced)
+    {
+        printf("[PWR-ERR] System not synced with GPS/VBAT. Abort standby.\r\n");
+        return; 
+    }
     printf("[PWR] enter standby mode...\r\n");
     osDelay(200);
     HAL_GPIO_WritePin(GPS_EN_GPIO_Port, GPS_EN_Pin, GPIO_PIN_RESET); // 高电平gps工作

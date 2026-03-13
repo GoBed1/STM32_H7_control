@@ -25,7 +25,6 @@ static uint8_t s_test_schedule_configured = 0;
 void enter_standby(void);
 void set_alarm_b(uint8_t utc_h, uint8_t utc_m);
 void gps_sync_rtc_once(void);
-void print_internal_rtc_time(void);
 void gps_print_nmea_data(const char *tag)
 {
     LOGD("[%s] fix=%u sat=%u view=%u mode=%u time=%02u:%02u:%02u date=%04u-%02u-%02u\r\n",

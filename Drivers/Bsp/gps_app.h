@@ -22,6 +22,8 @@ void rtc_power_schedule_check(void);
 uint8_t rtc_is_wakeup_from_standby(void);
 void gps_test_nmea_parser(void);
 void update_gps_time_loop(void);
+void print_internal_rtc_time(void);
+
 #ifdef __cplusplus
 }
 #endif

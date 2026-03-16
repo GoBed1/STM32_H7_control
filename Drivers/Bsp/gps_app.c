@@ -184,7 +184,7 @@ void run_10_oclock_standby_test(void)
 }
 
 // 循环轮询更新gps时间
-void update_gps_time_loop(void)
+void update_gps_time_loop_test(void)
 {
     // 手动让时间流逝：每秒给假 GPS 时间加 1 秒
     g_nmea_gnss.time_s++;
@@ -275,6 +275,8 @@ void rtc_power_init(void)
     modbus_registers[STATUS_POWER_OFF_TIME] = POWER_OFF_DEFAULT;
     modbus_registers[STATUS_POWER_ON_TIME] = POWER_ON_DEFAULT;
 
+    modbus_registers[STANDBY_ENABLE] = 1; // 默认启用定时待机功能
+
     if (rtc_is_wakeup_from_standby())
     {
         printf("[PWR] from standby\r\n");
@@ -312,9 +314,6 @@ void print_internal_rtc_time(void)
 
     // 将 RTC 的 UTC 时间转换为北京时间 (UTC+8)
     uint8_t beijing_h = (sTime.Hours + 8) % 24;
-
-    // 考虑到跨天情况，简单处理：如果 beijing_h < 8，说明跨到了第二天。
-    // 为了日志简洁，这里暂不对 Date 进行 +1 天的复杂计算，仅打印时间。
 
     printf("is real write into internal RTC: 20%02u-%02u-%02u %02u:%02u:%02u | Beijing Time: %02u:%02u:%02u\r\n",
            sDate.Year, sDate.Month, sDate.Date,
@@ -385,7 +384,10 @@ void rtc_power_schedule_check(void)
            off_hhmm >> 8, off_hhmm & 0xFF,
            on_hhmm >> 8, on_hhmm & 0xFF);
 
-    if (now_hhmm == off_hhmm) // 精确匹配
+    // 把当前rtc时间暴露在modbusReg中，方便外部监控
+    modbus_registers[RTC_TIME] = now_hhmm;
+
+    if (now_hhmm == off_hhmm && modbus_registers[STANDBY_ENABLE] == 1) // 精确匹配且待机功能启用
     {
         // 关闭LED和喇叭
         modbus_registers[0] = 0;
@@ -450,7 +452,7 @@ void enter_standby(void)
     if (!s_gps_synced)
     {
         printf("[PWR-ERR] System not synced with GPS/VBAT. Abort standby.\r\n");
-        return; 
+        return;
     }
     printf("[PWR] enter standby mode...\r\n");
     osDelay(200);

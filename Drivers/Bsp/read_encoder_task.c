@@ -2,6 +2,8 @@
 // #include "encoder_forward_app.h"
 
 #define LOGD(...) // printf(__VA_ARGS__)
+#define LOGD(...)  printf(__VA_ARGS__)
+
 #define LOGI(...) printf(__VA_ARGS__)
 #define LOGE(...) printf(__VA_ARGS__)
 
@@ -233,8 +235,6 @@ void init_ai_safy_slave(void)
 
     // HACK 设置系统信息
     modbus_registers[REG_ERROR_CODE] = 0x0000; // 清零错误码/在线状态
-    // modbus_registers[REG_TOTAL_SENSORS] = 3;
-    // modbus_registers[REG_SYSTEM_VERSION] = HUB_SLAVE_VERSION; // 记录系统版本号
 
     // 配置MODBUS Slave处理器
     encoder_forward_server.uModbusType = MB_SLAVE;
@@ -244,7 +244,6 @@ void init_ai_safy_slave(void)
     encoder_forward_server.EN_Pin = 0;
     encoder_forward_server.u16regs = modbus_registers;            // 保持寄存器
     encoder_forward_server.u16inputregs = modbus_input_registers; // 输入寄存器
-
     encoder_forward_server.u16regsize = REGS_TOTAL_NUM;
     encoder_forward_server.u16timeOut = 1000; // 1秒超时
     encoder_forward_server.xTypeHW = USART_HW;
@@ -772,8 +771,8 @@ void RFID_master_thread(void *argument)
 void gps_standby_thread(void *argument)
 {
     
-    // config_gps_app();
-    // rtc_power_init();
+    config_gps_app();
+    rtc_power_init();
     // run_10_oclock_standby_test();
 
     for (;;)
@@ -781,13 +780,13 @@ void gps_standby_thread(void *argument)
 
         // 每1s轮询一次GPS数据
         // 每1s轮询一次GPS数据
-        // update_gps_app();
+        update_gps_app();
         // // 检测是否进入待机状态
         // run_10_oclock_standby_test();
         // update_gps_time_loop();
-        print_internal_rtc_time();
+        // print_internal_rtc_time();
 
-        // rtc_power_schedule_check();
+        rtc_power_schedule_check();
 
         HAL_GPIO_TogglePin(GPIOD, H_B_LED_Pin);
         // HAL_GPIO_TogglePin(RELAY_1_PIN_GPIO_Port, RELAY_1_PIN_Pin);

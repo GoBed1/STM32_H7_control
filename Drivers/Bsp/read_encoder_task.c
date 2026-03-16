@@ -16,6 +16,7 @@
 
 #define STATUS_BUZZER 101
 #define STATUS_BMS_BATTERY 102
+#define STATUS_HEART_BEAT 104
 #define STATUS_BMS_REMAIN_DISCHARGE_TIME 105
 #define STATUS_WORK_MODE 106
 #define STATUS_BMS_IS_charge 107
@@ -75,12 +76,19 @@ const osThreadAttr_t RFID_master_attributes = {
     .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
 };
-
+//gps待机线程
 osThreadId_t gps_standby_handle;
 const osThreadAttr_t gps_standby_attributes = {
     .name = "GPSStandby",
     .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
+};
+// 心跳检测任务 
+osThreadId_t relay_heartbeat_handle;
+const osThreadAttr_t relay_heartbeat_attributes = {
+    .name = "RelayHeartbeat",
+    .stack_size = 1024 * 4,
+    .priority = (osPriority_t)osPriorityNormal,
 };
 
 uint8_t first_findVolume = 1;
@@ -307,9 +315,9 @@ void buzzer_logic(void)
         // bms_led_sound_app.asyncWriteSingle(0x02, 0x0008, 0x0007);
         //    static uint16_t buzzer_cmd = 0x0007;
         // telegram[2].u16reg = &buzzer_cmd;
-        telegram[2].u16RegAdd = 0x0008;
-        telegram[2].u16reg[0] = 0x0007;
-        ModbusQuery(&bms_sound_light_app, telegram[2]);
+        telegram[1].u16RegAdd = 0x0008;
+        telegram[1].u16reg[0] = 0x0009;
+        ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
@@ -323,9 +331,9 @@ void buzzer_logic(void)
         break;
 
     case BUZZER_7M:
-        telegram[2].u16RegAdd = 0x0008;
-        telegram[2].u16reg[0] = 0x0008;
-        ModbusQuery(&bms_sound_light_app, telegram[2]);
+        telegram[1].u16RegAdd = 0x0008;
+        telegram[1].u16reg[0] = 0x0008;
+        ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
         {
@@ -339,9 +347,9 @@ void buzzer_logic(void)
         break;
 
     default: // OFF
-        telegram[2].u16RegAdd = 0x0016;
-        telegram[2].u16reg[0] = 0x0001;
-        ModbusQuery(&bms_sound_light_app, telegram[2]);
+        telegram[1].u16RegAdd = 0x000E;
+        telegram[1].u16reg[0] = 0x0000;
+        ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err != OP_OK_QUERY)
         {
@@ -657,9 +665,9 @@ void ai_safy_master_thread(void *argument)
         // 读取音量寄存器
         if (now_volume != last_volume)
         { // 如果音量有变化
-            telegram[2].u16RegAdd = 0x0006;
-            telegram[2].u16reg[0] = now_volume;
-            ModbusQuery(&bms_sound_light_app, telegram[2]); // 调整喇叭的实际输出音量。
+            telegram[1].u16RegAdd = 0x0006;
+            telegram[1].u16reg[0] = now_volume;
+            ModbusQuery(&bms_sound_light_app, telegram[1]); // 调整喇叭的实际输出音量。
             uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
             if (err == OP_OK_QUERY)
             {
@@ -678,7 +686,7 @@ void ai_safy_master_thread(void *argument)
         {
             if (modbus_registers[STATUS_BMS_BATTERY] <= 2000)
             {
-                modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
+                    modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
             }
             else
             {
@@ -698,16 +706,16 @@ void ai_safy_master_thread(void *argument)
             }
         }
 
-        // 心跳逻辑 & GPS数据轮询
-        if (xTaskGetTickCount() - last_heartbeat >= pdMS_TO_TICKS(1000))
-        {
-            last_heartbeat += pdMS_TO_TICKS(1000);
+        // // 心跳逻辑 & GPS数据轮询
+        // if (xTaskGetTickCount() - last_heartbeat >= pdMS_TO_TICKS(1000))
+        // {
+        //     last_heartbeat += pdMS_TO_TICKS(1000);
 
-            // 心跳值递增并处理溢出
-            modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
+        //     // 心跳值递增并处理溢出
+        //     modbus_registers[104] = (modbus_registers[104] + 1) % 65536;
 
-            LOGD("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
-        }
+        //     LOGD("[Heartbeat] reg[104] = %d\r\n", modbus_registers[104]);
+        // }
 
         osDelay(500);
     }
@@ -767,7 +775,7 @@ void RFID_master_thread(void *argument)
         osDelay(1000);
     }
 }
-
+// GPS待机线程
 void gps_standby_thread(void *argument)
 {
     
@@ -791,6 +799,43 @@ void gps_standby_thread(void *argument)
         HAL_GPIO_TogglePin(GPIOD, H_B_LED_Pin);
         // HAL_GPIO_TogglePin(RELAY_1_PIN_GPIO_Port, RELAY_1_PIN_Pin);
 
+        osDelay(1000);
+    }
+}
+// 继电器心跳检测线程
+void relay_heartbeat_thread(void *argument)
+{
+    // 初始化上次心跳值和接收时间
+    uint16_t last_heartbeat_val = modbus_registers[STATUS_HEART_BEAT];
+    TickType_t recv_heartbeat_time = xTaskGetTickCount();
+
+    for (;;)
+    {
+        uint16_t current_heartbeat = modbus_registers[STATUS_HEART_BEAT];
+
+        // 1. 检查心跳是否有变化
+        if (current_heartbeat != last_heartbeat_val)
+        {
+            last_heartbeat_val = current_heartbeat;
+            recv_heartbeat_time = xTaskGetTickCount(); // 更新最后一次收到心跳的时间
+            
+        
+            // 收到心跳，继电器引脚置为1 (上电)
+            HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
+            LOGD("[Heartbeat] Host active. Relay 2 SET to 1. Reg[104]=%d\r\n", current_heartbeat);
+        }
+        else
+        {
+            // 2. 如果没有变化，检查是否超时 1 分钟 (60000 毫秒)
+            if ((xTaskGetTickCount() - recv_heartbeat_time) > pdMS_TO_TICKS(60*1000))
+            {
+                // 超时1分钟，继电器引脚置为0 (下电)
+                HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_RESET);
+                LOGD("[Heartbeat] Timeout (>1 min). Relay 2 SET to 0.\r\n");
+            }
+        }
+
+        // 每秒轮询一次
         osDelay(1000);
     }
 }
@@ -818,4 +863,5 @@ void init_read_encoder_task()
     ai_safy_master_handle = osThreadNew(ai_safy_master_thread, NULL, &ai_safy_master_attributes);
     RFID_master_handle = osThreadNew(RFID_master_thread, NULL, &RFID_master_attributes);
     gps_standby_handle = osThreadNew(gps_standby_thread, NULL, &gps_standby_attributes);
+    relay_heartbeat_handle = osThreadNew(relay_heartbeat_thread, NULL, &relay_heartbeat_attributes);
 }

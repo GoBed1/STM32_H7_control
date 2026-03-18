@@ -367,7 +367,7 @@ void modbus_TxData_logic(void)
     {
         LOGD(" LED on \n");
         telegram[1].u16RegAdd = 0x00C2;
-        telegram[1].u16reg[0] = 0x0051;//慢闪，爆闪改为61
+        telegram[1].u16reg[0] = 0x0051; // 慢闪，爆闪改为61
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
@@ -484,6 +484,27 @@ void ai_safy_master_thread(void *argument)
 
     for (;;)
     {
+
+        // 设置音量
+        now_volume = modbus_registers[103];
+
+        // 读取音量寄存器
+        if (now_volume != last_volume)
+        { // 如果音量有变化
+            telegram[1].u16RegAdd = 0x0006;
+            telegram[1].u16reg[0] = now_volume;
+            ModbusQuery(&bms_sound_light_app, telegram[1]); // 调整喇叭的实际输出音量。
+            uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+            if (err == OP_OK_QUERY)
+            {
+                LOGD("BUZZER_VOLUME write success, lastvolume=%d , nowVolume=%d,modbusReg[103]:%d\n", last_volume, now_volume, modbus_registers[103]);
+                last_volume = now_volume; // 更新上一次的音量记录以供下次比较使用。
+            }
+            else
+            {
+                LOGD("BUZZER_VOLUME write fail : %d \n", err);
+            }
+        }
 
         // 每 500ms 轮询一次led & buzzer
         if (xTaskGetTickCount() - last_500ms >= pdMS_TO_TICKS(500))
@@ -637,26 +658,7 @@ void ai_safy_master_thread(void *argument)
             charge_idx = 0;
             charge_count = 0;
         }
-        // 设置音量
-        now_volume = modbus_registers[103];
 
-        // 读取音量寄存器
-        if (now_volume != last_volume)
-        { // 如果音量有变化
-            telegram[1].u16RegAdd = 0x0006;
-            telegram[1].u16reg[0] = now_volume;
-            ModbusQuery(&bms_sound_light_app, telegram[1]); // 调整喇叭的实际输出音量。
-            uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-            if (err == OP_OK_QUERY)
-            {
-                LOGD("BUZZER_VOLUME write success, lastvolume=%d , nowVolume=%d,modbusReg[103]:%d\n", last_volume, now_volume, modbus_registers[103]);
-                last_volume = now_volume; // 更新上一次的音量记录以供下次比较使用。
-            }
-            else
-            {
-                LOGD("BUZZER_VOLUME write fail : %d \n", err);
-            }
-        }
         // 判断工作状态
         if ((modbus_registers[STATUS_LED_SWITCH] == 1 && modbus_registers[STATUS_BUZZER] == 1) ||
             (modbus_registers[STATUS_LED_SWITCH] == 1 && modbus_registers[STATUS_BUZZER] == 0) ||
@@ -857,8 +859,8 @@ void init_read_encoder_task()
     HAL_GPIO_WritePin(RELAY_1_PIN_GPIO_Port, RELAY_1_PIN_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
 
+    relay_heartbeat_handle = osThreadNew(relay_heartbeat_thread, NULL, &relay_heartbeat_attributes);
     ai_safy_master_handle = osThreadNew(ai_safy_master_thread, NULL, &ai_safy_master_attributes);
     RFID_master_handle = osThreadNew(RFID_master_thread, NULL, &RFID_master_attributes);
     gps_standby_handle = osThreadNew(gps_standby_thread, NULL, &gps_standby_attributes);
-    relay_heartbeat_handle = osThreadNew(relay_heartbeat_thread, NULL, &relay_heartbeat_attributes);
 }

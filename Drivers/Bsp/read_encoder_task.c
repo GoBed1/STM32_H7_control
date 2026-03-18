@@ -2,7 +2,7 @@
 // #include "encoder_forward_app.h"
 
 #define LOGD(...) // printf(__VA_ARGS__)
-#define LOGD(...)  printf(__VA_ARGS__)
+#define LOGD(...) printf(__VA_ARGS__)
 
 #define LOGI(...) printf(__VA_ARGS__)
 #define LOGE(...) printf(__VA_ARGS__)
@@ -48,8 +48,8 @@ static modbusHandler_t encoder_forward_server;
 #define REGS_TOTAL_NUM 256
 uint16_t modbus_registers[REGS_TOTAL_NUM] = {0};
 uint16_t modbus_input_registers[REGS_TOTAL_NUM] = {0};
-uint16_t now_volume;           // 假设音量寄存器地址为103
-uint16_t last_volume = 0x001E; // 初始音量为30
+uint16_t now_volume;      // 假设音量寄存器地址为103
+uint16_t last_volume = 0; // 确保开机第一次循环必定能进if分支
 
 void RFID_master_thread(void *argument);
 void RFID_OnFrame(RFIDClient *c, const uint8_t *frm, uint16_t len);
@@ -76,14 +76,14 @@ const osThreadAttr_t RFID_master_attributes = {
     .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
 };
-//gps待机线程
+// gps待机线程
 osThreadId_t gps_standby_handle;
 const osThreadAttr_t gps_standby_attributes = {
     .name = "GPSStandby",
     .stack_size = 1024 * 4,
     .priority = (osPriority_t)osPriorityNormal1,
 };
-// 心跳检测任务 
+// 心跳检测任务
 osThreadId_t relay_heartbeat_handle;
 const osThreadAttr_t relay_heartbeat_attributes = {
     .name = "RelayHeartbeat",
@@ -243,7 +243,6 @@ void init_ai_safy_slave(void)
 
     // HACK 设置系统信息
     modbus_registers[REG_ERROR_CODE] = 0x0000; // 清零错误码/在线状态
-
     // 配置MODBUS Slave处理器
     encoder_forward_server.uModbusType = MB_SLAVE;
     encoder_forward_server.u8id = FORWARD_SLAVE_ADDR; // Slave ID=3
@@ -273,15 +272,12 @@ uint16_t remainDischargeTime_results[2] = {0};
 
 uint16_t firstVolume_results[2] = {0};
 modbus_t telegram[8];
+
 modbus_t telegram2[3];
 
 // HACK
 uint16_t modbus_master_buf[128] = {0};
 uint16_t modbus_master_buf2[128] = {0};
-
-// static const uint16_t modbusRFID[] = {
-
-// };
 
 // 喇叭逻辑处理函数
 void buzzer_logic(void)
@@ -310,11 +306,7 @@ void buzzer_logic(void)
     switch (target)
     {
     case BUZZER_3M:
-        // record_tx_cmd(cmd_sound_3m_warn, 6);
-        // BUZZER_SOUND_3M_WARN;
-        // bms_led_sound_app.asyncWriteSingle(0x02, 0x0008, 0x0007);
-        //    static uint16_t buzzer_cmd = 0x0007;
-        // telegram[2].u16reg = &buzzer_cmd;
+
         telegram[1].u16RegAdd = 0x0008;
         telegram[1].u16reg[0] = 0x0009;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
@@ -373,14 +365,9 @@ void modbus_TxData_logic(void)
     // 灯打开或关闭命令
     if (cmd_led_switch == 1 && modbus_registers[STATUS_LED_SWITCH] == 0)
     {
-        // 红灯打常量开
-        // 记录超时或者crc校验重复发送命令的逻辑
-        // record_tx_cmd(cmd_red_com, 6);
-        // YX95R_LIGHT_ON_RED_COM;
         LOGD(" LED on \n");
-        // bms_led_sound_app.asyncWriteSingle(0x01,0x00c2,0x0041);
         telegram[1].u16RegAdd = 0x00C2;
-        telegram[1].u16reg[0] = 0x0041;
+        telegram[1].u16reg[0] = 0x0051;//慢闪，爆闪改为61
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         if (err)
@@ -394,19 +381,13 @@ void modbus_TxData_logic(void)
 
         // 更新状态寄存器regs[100]且清除命令寄存器regs[0]
         modbus_registers[STATUS_LED_SWITCH] = 1;
-        // 通知RX任务：我发送了命令，你可以等待响应了！
     }
+
     if (cmd_led_switch == 0 && modbus_registers[STATUS_LED_SWITCH] == 1)
     {
-        // 灯关闭
-        // debug_println(" LED off ");
-        // YX95R_RGB_Light_Off(1); // 红色慢闪
-        // record_tx_cmd(cmd_off, 6);
 
         // YX95R_LIGHT_OFF;
         LOGD(" LED off \n");
-        // HACK
-        // bms_led_sound_app.asyncWriteSingle(0x01, 0x00c2, 0x0060);
         telegram[1].u16RegAdd = 0x00C2;
         telegram[1].u16reg[0] = 0x0060;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
@@ -426,9 +407,6 @@ void modbus_TxData_logic(void)
 
     // 喇叭逻辑处理
     buzzer_logic();
-
-    // bms电源读取发送
-    // bms_read_logic();
 }
 
 void ai_safy_master_thread(void *argument)
@@ -686,7 +664,7 @@ void ai_safy_master_thread(void *argument)
         {
             if (modbus_registers[STATUS_BMS_BATTERY] <= 2000)
             {
-                    modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
+                modbus_registers[STATUS_WORK_MODE] = 2; // 工作状态为2，即低电量警告模式
             }
             else
             {
@@ -778,7 +756,7 @@ void RFID_master_thread(void *argument)
 // GPS待机线程
 void gps_standby_thread(void *argument)
 {
-    
+
     config_gps_app();
     rtc_power_init();
     // run_10_oclock_standby_test();
@@ -808,7 +786,8 @@ void relay_heartbeat_thread(void *argument)
     // 初始化上次心跳值和接收时间
     uint16_t last_heartbeat_val = modbus_registers[STATUS_HEART_BEAT];
     TickType_t recv_heartbeat_time = xTaskGetTickCount();
-
+    // 刚开机时默认是有电状态，1代表有电，0代表断电
+    uint8_t relay_is_on = 1;
     for (;;)
     {
         uint16_t current_heartbeat = modbus_registers[STATUS_HEART_BEAT];
@@ -818,17 +797,35 @@ void relay_heartbeat_thread(void *argument)
         {
             last_heartbeat_val = current_heartbeat;
             recv_heartbeat_time = xTaskGetTickCount(); // 更新最后一次收到心跳的时间
-            
-        
-            // 收到心跳，继电器引脚置为1 (上电)
-            HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
-            LOGD("[Heartbeat] Host active. Relay 2 SET to 1. Reg[104]=%d\r\n", current_heartbeat);
+            if (relay_is_on == 0)
+            {
+                // 收到心跳，继电器引脚置为1 (上电)
+                HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
+                last_volume = 0xFFFF; // 音量更新,主循环会更新
+                relay_is_on = 1;      // 标记为有电状态
+            }
+            else
+            {
+                // 收到心跳，继电器引脚置为1 (上电)
+                HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
+                LOGD("[Heartbeat] Host active. Relay 2 SET to 1. Reg[104]=%d\r\n", current_heartbeat);
+            }
         }
         else
         {
             // 2. 如果没有变化，检查是否超时 1 分钟 (60000 毫秒)
-            if ((xTaskGetTickCount() - recv_heartbeat_time) > pdMS_TO_TICKS(60*1000))
+            if ((xTaskGetTickCount() - recv_heartbeat_time) > pdMS_TO_TICKS(60 * 1000) && relay_is_on == 1)
             {
+                // 声光警报关闭
+                //  关闭LED和喇叭
+                modbus_registers[CMD_LED_SWITCH] = 0;
+                modbus_registers[CMD_BUZZER_7m] = 0;
+                modbus_registers[CMD_BUZZER_3m] = 0;
+                modbus_registers[STATUS_LED_SWITCH] = 0;
+                modbus_registers[STATUS_BUZZER] = 0;
+
+                relay_is_on = 0; // 标记为断电状态
+
                 // 超时1分钟，继电器引脚置为0 (下电)
                 HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_RESET);
                 LOGD("[Heartbeat] Timeout (>1 min). Relay 2 SET to 0.\r\n");
@@ -851,7 +848,7 @@ void init_read_encoder_task()
     // modbus_registers[0] = 0;
     // 初始音量调为最大
     modbus_registers[103] = 0x001E; // 30的十六进制
-    now_volume = 0x1E;
+    // now_volume = 0x1E;
     // 关机&开机时间设置为每天的21:00-次日6:00
     // modbus_registers[STATUS_POWER_OFF_TIME] = (21 << 8) | 0; // 21:00
     // modbus_registers[STATUS_POWER_ON_TIME] = (6 << 8) | 0;   // 06:00

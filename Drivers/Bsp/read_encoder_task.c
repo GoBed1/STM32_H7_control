@@ -1,7 +1,7 @@
 #include "read_encoder_task.h"
 // #include "encoder_forward_app.h"
 
-#define LOGD(...) // printf(__VA_ARGS__)
+// #define LOGD(...)  printf(__VA_ARGS__)
 #define LOGD(...) printf(__VA_ARGS__)
 
 #define LOGI(...) printf(__VA_ARGS__)
@@ -283,79 +283,73 @@ uint16_t modbus_master_buf2[128] = {0};
 void buzzer_logic(void)
 {
     // 算目标模式：3m 优先于 7m，3m覆盖7m，二者都为0时关闭喇叭。
-    buzzer_mode_t target = BUZZER_OFF;
+    // 关联：2=3m, 1=7m, 0=OFF
+    uint16_t target_mode = 0;
 
     if (modbus_registers[CMD_BUZZER_3m] == 1)
     {
-        target = BUZZER_3M;
+        target_mode = 2;
     }
     else if (modbus_registers[CMD_BUZZER_7m] == 1)
     {
-        target = BUZZER_7M;
+        target_mode = 1;
     }
     else
     {
-        target = BUZZER_OFF;
+        target_mode = 0;
     }
 
     // 只在变化时执行
-    static buzzer_mode_t current = BUZZER_OFF;
-    if (target == current)
+    // static buzzer_mode_t current = BUZZER_OFF;
+    // 心跳掉电时，STATUS_BUZZER 会被清 0
+    uint16_t current_mode = modbus_registers[STATUS_BUZZER];
+
+    if (target_mode == current_mode)
         return;
     uint32_t err = 0;
-    switch (target)
+    
+if (target_mode == 2) // 执行开启 3M
     {
-    case BUZZER_3M:
-
-        telegram[1].u16RegAdd = 0x0008;
-        telegram[1].u16reg[0] = 0x0009;
-        ModbusQuery(&bms_sound_light_app, telegram[1]);
-        err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        if (err)
-        {
-            LOGD("BUZZER_3M write fail : %d \n", err);
-        }
-        else
-        {
-            LOGD("BUZZER_3M write success\n");
-        }
-        modbus_registers[STATUS_BUZZER] = 1;
-        break;
-
-    case BUZZER_7M:
         telegram[1].u16RegAdd = 0x0008;
         telegram[1].u16reg[0] = 0x0008;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        if (err)
-        {
-            LOGD("BUZZER_7M write fail : %d \n", err);
+        
+        if (err != OP_OK_QUERY) {
+            LOGD("BUZZER_3M write fail, retrying...\n");
+        } else {
+            LOGD("BUZZER_3M write success\n");
+            modbus_registers[STATUS_BUZZER] = 2; // 【关键】发送成功才将状态登记为 2
         }
-        else
-        {
+    }
+    else if (target_mode == 1) // 执行开启 7M
+    {
+        telegram[1].u16RegAdd = 0x0008;
+        telegram[1].u16reg[0] = 0x0009;
+        ModbusQuery(&bms_sound_light_app, telegram[1]);
+        err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
+        
+        if (err != OP_OK_QUERY) {
+            LOGD("BUZZER_7M write fail, retrying...\n");
+        } else {
             LOGD("BUZZER_7M write success\n");
+            modbus_registers[STATUS_BUZZER] = 1; // 发送成功才将状态登记为 1
         }
-        modbus_registers[STATUS_BUZZER] = 1;
-        break;
-
-    default: // OFF
+    }
+    else // 执行关闭 (OFF)
+    {
         telegram[1].u16RegAdd = 0x000E;
         telegram[1].u16reg[0] = 0x0000;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        if (err != OP_OK_QUERY)
-        {
-            LOGD("BUZZER_SOUND_STOP write fail : %d \n", err);
-        }
-        else
-        {
+        
+        if (err != OP_OK_QUERY) {
+            LOGD("BUZZER_SOUND_STOP write fail, retrying...\n");
+        } else {
             LOGD("BUZZER_SOUND_STOP write success\n");
+            modbus_registers[STATUS_BUZZER] = 0; // 发送成功才将状态清 0
         }
-        modbus_registers[STATUS_BUZZER] = 0;
-        break;
     }
-
-    current = target;
 }
 
 void modbus_TxData_logic(void)
@@ -370,17 +364,19 @@ void modbus_TxData_logic(void)
         telegram[1].u16reg[0] = 0x0051; // 慢闪，爆闪改为61
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        if (err)
+        if (err== OP_OK_QUERY)
         {
-            LOGD("LED on write fail : %d \n", err);
+            LOGD("LED on write success : %d \n", err);
+            // 更新状态寄存器regs[100]且清除命令寄存器regs[0]
+            modbus_registers[STATUS_LED_SWITCH] = 1;
         }
         else
         {
-            LOGD("LED on write success\n");
+            LOGD("LED on write fail : %d \n", err);
+            
         }
 
-        // 更新状态寄存器regs[100]且清除命令寄存器regs[0]
-        modbus_registers[STATUS_LED_SWITCH] = 1;
+        
     }
 
     if (cmd_led_switch == 0 && modbus_registers[STATUS_LED_SWITCH] == 1)
@@ -392,15 +388,17 @@ void modbus_TxData_logic(void)
         telegram[1].u16reg[0] = 0x0060;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         uint32_t err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
-        if (err)
+        if (err== OP_OK_QUERY)
         {
-            LOGD("LED on write fail : %d \n", err);
+            LOGD("LED off write success : %d \n", err);
+            //成功后更新状态寄存器regs[100]且清除命令寄存器regs[0]
+            modbus_registers[STATUS_LED_SWITCH] = 0;
         }
         else
         {
-            LOGD("LED on write success\n");
+            LOGD("LED off write fail : %d \n", err);
+            
         }
-        modbus_registers[STATUS_LED_SWITCH] = 0;
         // 通知RX任务：我发送了命令，你可以等待响应了！
         // xEventGroupSetBits(eg, EVENT_CMD_SENT);
     }
@@ -805,6 +803,8 @@ void relay_heartbeat_thread(void *argument)
                 HAL_GPIO_WritePin(RELAY_2_PIN_GPIO_Port, RELAY_2_PIN_Pin, GPIO_PIN_SET);
                 last_volume = 0xFFFF; // 音量更新,主循环会更新
                 relay_is_on = 1;      // 标记为有电状态
+                modbus_registers[STATUS_LED_SWITCH]=0;// 灯关闭,如果指令寄存器=1，主循环会处理的
+
             }
             else
             {

@@ -2,7 +2,7 @@
 // #include "encoder_forward_app.h"
 
 // #define LOGD(...)  printf(__VA_ARGS__)
-#define LOGD(...) printf(__VA_ARGS__)
+#define LOGD(...) //printf(__VA_ARGS__)
 
 #define LOGI(...) printf(__VA_ARGS__)
 #define LOGE(...) printf(__VA_ARGS__)
@@ -311,7 +311,7 @@ void buzzer_logic(void)
 if (target_mode == 2) // 执行开启 3M
     {
         telegram[1].u16RegAdd = 0x0008;
-        telegram[1].u16reg[0] = 0x0008;
+        telegram[1].u16reg[0] = 0x0009;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         
@@ -325,7 +325,7 @@ if (target_mode == 2) // 执行开启 3M
     else if (target_mode == 1) // 执行开启 7M
     {
         telegram[1].u16RegAdd = 0x0008;
-        telegram[1].u16reg[0] = 0x0009;
+        telegram[1].u16reg[0] = 0x0008;
         ModbusQuery(&bms_sound_light_app, telegram[1]);
         err = ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(1000));
         
